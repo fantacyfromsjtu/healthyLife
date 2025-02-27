@@ -1,0 +1,84 @@
+# Python字节编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+.env/
+env.bak/
+venv.bak/
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 日志文件
+*.log
+logs/
+
+# IDE和编辑器文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+.spyderproject
+.spyproject
+.ropeproject
+
+# 项目特定文件
+healthylife.db
+app.log
+/resources/icons/*.png
+/resources/icons/*.jpg
+/resources/icons/*.ico
+/resources/templates/*.pdf
+
+# 测试相关
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# PyInstaller生成的文件
+*.manifest
+*.spec
+dist/
+build/
+
+# 文档构建目录
+docs/_build/
+docs/api/
+
+# 个人配置文件
+config.ini
+*.ini
+*.conf
+!example.ini
+!default.conf 

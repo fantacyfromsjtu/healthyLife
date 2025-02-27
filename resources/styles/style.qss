@@ -1,0 +1,172 @@
+/* 主应用样式表 */
+
+/* 通用设置 */
+QWidget {
+    font-family: 'Microsoft YaHei UI', '微软雅黑', '思源黑体', 'Segoe UI', 'Roboto', sans-serif;
+    font-size: 10pt;
+}
+
+/* 主窗口样式 */
+QMainWindow {
+    background-color: #f5f5f5;
+}
+
+/* 标签样式 */
+QLabel {
+    color: #2c3e50;
+    font-size: 11pt;
+}
+
+QLabel#heading, QLabel#welcomeLabel {
+    font-size: 20pt;
+    font-weight: bold;
+    color: #2c3e50;
+    padding: 10px 5px;
+}
+
+QLabel#dateLabel {
+    font-size: 18pt;
+    font-weight: bold;
+    color: #2c3e50;
+    padding: 12px;
+}
+
+QLabel#appTitle {
+    font-size: 28pt;
+    font-weight: bold;
+    color: #3498db;
+    margin-bottom: 10px;
+}
+
+QLabel#appDescription {
+    font-size: 16pt;
+    color: #7f8c8d;
+    margin-bottom: 25px;
+}
+
+QLabel#copyright {
+    font-size: 9pt;
+    color: #95a5a6;
+    margin-top: 15px;
+}
+
+/* 按钮样式 */
+QPushButton {
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+    font-size: 12pt;
+}
+
+QPushButton#primaryButton, QPushButton#actionButton {
+    background-color: #3498db;
+    color: white;
+    font-weight: bold;
+    min-height: 45px;
+    font-size: 14pt;
+}
+
+QPushButton#primaryButton:hover, QPushButton#actionButton:hover {
+    background-color: #2980b9;
+}
+
+QPushButton#secondaryButton {
+    background-color: #2ecc71;
+    color: white;
+    font-weight: bold;
+    min-height: 45px;
+    font-size: 14pt;
+}
+
+QPushButton#secondaryButton:hover {
+    background-color: #27ae60;
+}
+
+/* 输入框样式 */
+QLineEdit, QLineEdit#inputField {
+    padding: 12px;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 12pt;
+    min-height: 25px;
+}
+
+QLineEdit:focus, QLineEdit#inputField:focus {
+    border: 1px solid #3498db;
+}
+
+/* 下拉框样式 */
+QComboBox, QComboBox#modeCombo {
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    padding: 8px;
+    background-color: white;
+    min-height: 30px;
+    font-size: 12pt;
+}
+
+/* 日历样式 */
+QCalendarWidget {
+    background-color: white;
+    selection-background-color: #3498db;
+    font-size: 12pt;
+}
+
+QCalendarWidget QToolButton {
+    color: #2c3e50;
+    background-color: #ecf0f1;
+    font-size: 13pt;
+    min-height: 35px;
+}
+
+/* 标签页样式 */
+QTabWidget::pane {
+    border: none;
+    background-color: white;
+}
+
+QTabWidget::tab-bar {
+    alignment: center;
+}
+
+QTabBar::tab {
+    background-color: #ecf0f1;
+    color: #7f8c8d;
+    min-width: 120px;
+    min-height: 35px;
+    padding: 8px 20px;
+    margin: 5px 2px 0px 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    font-size: 13pt;
+}
+
+QTabBar::tab:selected {
+    background-color: white;
+    color: #3498db;
+    font-weight: bold;
+}
+
+/* 面板样式 */
+QFrame#panel, QFrame#leftPanel, QFrame#rightPanel, QFrame#contentFrame {
+    background-color: white;
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+}
+
+/* 内容视图 */
+QLabel#contentView {
+    font-size: 20pt;
+    color: #7f8c8d;
+    background-color: #ecf0f1;
+    border-radius: 4px;
+    padding: 25px;
+}
+
+/* 分隔线 */
+QFrame#separator {
+    color: #bdc3c7;
+    max-height: 1px;
+} 

@@ -1,7 +1,8 @@
 from PyQt5.QtWidgets import (QMainWindow, QCalendarWidget, QVBoxLayout, QHBoxLayout, 
                             QWidget, QPushButton, QLabel, QComboBox, QStackedWidget,
-                            QAction, QToolBar, QMessageBox)
+                            QAction, QToolBar, QMessageBox, QFrame)
 from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
 
 class MainWindow(QMainWindow):
     def __init__(self, user_id, username):
@@ -13,7 +14,7 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         """初始化用户界面"""
         self.setWindowTitle(f'健康生活 - {self.username}')
-        self.resize(800, 600)
+        self.resize(1280, 900)  # 增大窗口尺寸
         
         # 创建中央部件
         central_widget = QWidget()
@@ -21,63 +22,107 @@ class MainWindow(QMainWindow):
         
         # 主布局
         main_layout = QHBoxLayout()
+        main_layout.setSpacing(20)  # 增加组件间距
         central_widget.setLayout(main_layout)
         
         # 左侧日历和功能区
         left_widget = QWidget()
+        left_widget.setObjectName("leftPanel")
         left_layout = QVBoxLayout()
         left_widget.setLayout(left_layout)
+        
+        # 添加用户欢迎标签
+        welcome_label = QLabel(f"欢迎, {self.username}!")
+        welcome_label.setObjectName("welcomeLabel")
+        left_layout.addWidget(welcome_label)
         
         # 日历控件
         self.calendar = QCalendarWidget()
         self.calendar.setGridVisible(True)
+        self.calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
+        self.calendar.setHorizontalHeaderFormat(QCalendarWidget.SingleLetterDayNames)
+        self.calendar.setObjectName("mainCalendar")
         self.calendar.selectionChanged.connect(self.date_selected)
         left_layout.addWidget(self.calendar)
         
         # 功能区 - 添加记录和计划
         function_layout = QHBoxLayout()
+        function_layout.setSpacing(10)
         
         # 添加记录按钮
         self.add_record_button = QPushButton("添加记录")
+        self.add_record_button.setObjectName("primaryButton")
+        self.add_record_button.setMinimumHeight(40)
         self.add_record_button.clicked.connect(self.add_record)
         function_layout.addWidget(self.add_record_button)
         
         # 添加计划按钮
         self.add_plan_button = QPushButton("添加计划")
+        self.add_plan_button.setObjectName("secondaryButton")
+        self.add_plan_button.setMinimumHeight(40)
         self.add_plan_button.clicked.connect(self.add_plan)
         function_layout.addWidget(self.add_plan_button)
         
         left_layout.addLayout(function_layout)
         
         # 右侧显示区域
-        right_widget = QWidget()
+        right_widget = QFrame()
+        right_widget.setObjectName("rightPanel")
+        right_widget.setFrameShape(QFrame.StyledPanel)
         right_layout = QVBoxLayout()
         right_widget.setLayout(right_layout)
         
         # 当前日期显示
         self.date_label = QLabel()
+        self.date_label.setObjectName("dateLabel")
         self.update_date_label()
         right_layout.addWidget(self.date_label)
+        
+        # 分隔线
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setObjectName("separator")
+        right_layout.addWidget(separator)
         
         # 显示模式选择
         mode_layout = QHBoxLayout()
         mode_label = QLabel("显示模式:")
+        mode_label.setObjectName("modeLabel")
         self.mode_combo = QComboBox()
+        self.mode_combo.setObjectName("modeCombo")
         self.mode_combo.addItems(["全部", "饮食", "运动", "睡眠", "计划"])
         self.mode_combo.currentIndexChanged.connect(self.mode_changed)
+        self.mode_combo.setMinimumHeight(30)
         mode_layout.addWidget(mode_label)
         mode_layout.addWidget(self.mode_combo)
+        mode_layout.addStretch()
         right_layout.addLayout(mode_layout)
         
         # 内容区域 - 使用堆叠部件切换不同视图
         self.content_stack = QStackedWidget()
+        self.content_stack.setObjectName("contentStack")
         
-        # 创建不同的内容视图 (简化版本，实际需要创建对应的视图)
+        # 创建不同的内容视图
         self.all_view = QLabel("全部内容视图")
+        self.all_view.setAlignment(Qt.AlignCenter)
+        self.all_view.setObjectName("contentView")
+        
         self.diet_view = QLabel("饮食内容视图")
+        self.diet_view.setAlignment(Qt.AlignCenter)
+        self.diet_view.setObjectName("contentView")
+        
         self.exercise_view = QLabel("运动内容视图")
+        self.exercise_view.setAlignment(Qt.AlignCenter)
+        self.exercise_view.setObjectName("contentView")
+        
         self.sleep_view = QLabel("睡眠内容视图")
+        self.sleep_view.setAlignment(Qt.AlignCenter)
+        self.sleep_view.setObjectName("contentView")
+        
         self.plan_view = QLabel("计划内容视图")
+        self.plan_view.setAlignment(Qt.AlignCenter)
+        self.plan_view.setObjectName("contentView")
         
         self.content_stack.addWidget(self.all_view)
         self.content_stack.addWidget(self.diet_view)
