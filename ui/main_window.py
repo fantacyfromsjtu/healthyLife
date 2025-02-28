@@ -5,10 +5,11 @@ from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
 
 class MainWindow(QMainWindow):
-    def __init__(self, user_id, username):
+    def __init__(self, user_id, username, db_manager):
         super().__init__()
         self.user_id = user_id
         self.username = username
+        self.db_manager = db_manager  # 添加数据库管理器
         self.init_ui()
         
     def init_ui(self):
@@ -219,7 +220,16 @@ class MainWindow(QMainWindow):
         
     def edit_profile(self):
         """编辑个人信息"""
-        QMessageBox.information(self, "提示", "个人信息编辑功能正在开发中...")
+        from ui.profile import ProfileWindow
+        profile_window = ProfileWindow(self.user_id, self.username, self.db_manager)
+        profile_window.profile_updated.connect(self.update_user_info)
+        profile_window.exec_()
+        
+    def update_user_info(self, user_id, username):
+        """更新用户信息后的回调"""
+        # 可以在这里更新主窗口中显示的用户信息
+        # 例如更新欢迎消息等
+        pass
         
     def show_daily_report(self):
         """显示每日报告"""

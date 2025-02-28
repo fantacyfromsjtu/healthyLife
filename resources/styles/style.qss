@@ -82,18 +82,30 @@ QPushButton#secondaryButton:hover {
     background-color: #27ae60;
 }
 
-/* 输入框样式 */
-QLineEdit, QLineEdit#inputField {
+/* 输入框样式 - 增加宽度 */
+QLineEdit, QLineEdit#inputField, QSpinBox, QDoubleSpinBox, QComboBox {
     padding: 12px;
     border: 1px solid #bdc3c7;
     border-radius: 4px;
     background-color: white;
     font-size: 12pt;
     min-height: 25px;
+    min-width: 300px; /* 增加输入框最小宽度 */
 }
 
 QLineEdit:focus, QLineEdit#inputField:focus {
     border: 1px solid #3498db;
+}
+
+/* 文本区域样式 - 增加宽度 */
+QTextEdit {
+    padding: 12px;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 12pt;
+    min-height: 100px;
+    min-width: 300px; /* 增加输入框最小宽度 */
 }
 
 /* 下拉框样式 */

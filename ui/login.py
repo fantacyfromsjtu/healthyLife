@@ -1,11 +1,15 @@
 from PyQt5.QtWidgets import (QWidget, QPushButton, QLineEdit, QLabel, 
                             QVBoxLayout, QHBoxLayout, QMessageBox, QTabWidget,
-                            QFrame)
+                            QFrame, QDialog)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QPixmap
+from PyQt5.QtCore import QTimer
 
 from database.db_manager import DatabaseManager
 from ui.main_window import MainWindow
+from ui.profile import ProfileWindow
+from utils.verification import validate_password_strength, generate_captcha_text, generate_captcha_image
+import time
 
 class LoginWindow(QWidget):
     def __init__(self):
@@ -67,6 +71,9 @@ class LoginWindow(QWidget):
         
         self.setLayout(main_layout)
         
+        # 初始选择登录标签页
+        self.tab_widget.setCurrentIndex(0)
+    
     def setup_login_tab(self):
         """设置登录标签页"""
         layout = QVBoxLayout()
@@ -93,6 +100,36 @@ class LoginWindow(QWidget):
         password_layout.addWidget(password_label)
         password_layout.addWidget(self.login_password)
         
+        # 图形验证码 (新增)
+        captcha_layout = QVBoxLayout()
+        captcha_label = QLabel("验证码")
+        captcha_label.setObjectName("fieldLabel")
+        
+        captcha_input_layout = QHBoxLayout()
+        self.login_captcha = QLineEdit()
+        self.login_captcha.setObjectName("inputField")
+        self.login_captcha.setPlaceholderText("请输入验证码")
+        self.login_captcha.setMaxLength(4)
+        self.login_captcha.setMinimumWidth(180)  # 适合验证码的宽度
+        
+        # 验证码图片标签
+        self.login_captcha_image = QLabel()
+        self.login_captcha_image.setFixedSize(160, 60)  # 增加尺寸
+        self.login_captcha_image.setCursor(Qt.PointingHandCursor)
+        self.login_captcha_image.mousePressEvent = self.refresh_login_captcha
+        
+        # 刷新验证码按钮
+        self.login_refresh_button = QPushButton("刷新")
+        self.login_refresh_button.setObjectName("secondaryButton")
+        self.login_refresh_button.clicked.connect(lambda: self.refresh_login_captcha(None))
+        
+        captcha_input_layout.addWidget(self.login_captcha, 3)
+        captcha_input_layout.addWidget(self.login_captcha_image, 1)
+        captcha_input_layout.addWidget(self.login_refresh_button, 1)
+        
+        captcha_layout.addWidget(captcha_label)
+        captcha_layout.addLayout(captcha_input_layout)
+        
         # 登录按钮
         self.login_button = QPushButton("登录")
         self.login_button.setObjectName("actionButton")
@@ -101,18 +138,23 @@ class LoginWindow(QWidget):
         # 添加到布局
         layout.addLayout(username_layout)
         layout.addLayout(password_layout)
+        layout.addLayout(captcha_layout)  # 添加验证码布局
         layout.addStretch()
         layout.addWidget(self.login_button)
         
         self.login_tab.setLayout(layout)
         
+        # 初始生成验证码
+        self.login_captcha_text = ""  # 存储当前登录验证码文本
+        self.refresh_login_captcha(None)
+    
     def setup_register_tab(self):
         """设置注册标签页"""
         layout = QVBoxLayout()
-        layout.setSpacing(15)  # 增加间距
+        layout.setSpacing(15)
         
         # 用户名
-        username_layout = QVBoxLayout()  # 改为垂直布局
+        username_layout = QVBoxLayout()
         username_label = QLabel("用户名")
         username_label.setObjectName("fieldLabel")
         self.register_username = QLineEdit()
@@ -121,19 +163,49 @@ class LoginWindow(QWidget):
         username_layout.addWidget(username_label)
         username_layout.addWidget(self.register_username)
         
+        # 图形验证码
+        captcha_layout = QVBoxLayout()
+        captcha_label = QLabel("验证码")
+        captcha_label.setObjectName("fieldLabel")
+        
+        captcha_input_layout = QHBoxLayout()
+        self.register_captcha = QLineEdit()
+        self.register_captcha.setObjectName("inputField")
+        self.register_captcha.setPlaceholderText("请输入验证码")
+        self.register_captcha.setMaxLength(4)
+        self.register_captcha.setMinimumWidth(180)  # 适合验证码的宽度
+        
+        # 验证码图片标签
+        self.captcha_image = QLabel()
+        self.captcha_image.setFixedSize(160, 60)  # 增加尺寸
+        self.captcha_image.setCursor(Qt.PointingHandCursor)
+        self.captcha_image.mousePressEvent = self.refresh_captcha
+        
+        # 刷新验证码按钮
+        self.refresh_button = QPushButton("刷新")
+        self.refresh_button.setObjectName("secondaryButton")
+        self.refresh_button.clicked.connect(lambda: self.refresh_captcha(None))
+        
+        captcha_input_layout.addWidget(self.register_captcha, 3)  # 3:1:1 的比例
+        captcha_input_layout.addWidget(self.captcha_image, 1)
+        captcha_input_layout.addWidget(self.refresh_button, 1)
+        
+        captcha_layout.addWidget(captcha_label)
+        captcha_layout.addLayout(captcha_input_layout)
+        
         # 密码
-        password_layout = QVBoxLayout()  # 改为垂直布局
+        password_layout = QVBoxLayout()
         password_label = QLabel("密码")
         password_label.setObjectName("fieldLabel")
         self.register_password = QLineEdit()
         self.register_password.setObjectName("inputField")
-        self.register_password.setPlaceholderText("请创建密码")
+        self.register_password.setPlaceholderText("请创建密码(至少8位，包含字母和数字)")
         self.register_password.setEchoMode(QLineEdit.Password)
         password_layout.addWidget(password_label)
         password_layout.addWidget(self.register_password)
         
         # 确认密码
-        confirm_layout = QVBoxLayout()  # 改为垂直布局
+        confirm_layout = QVBoxLayout()
         confirm_label = QLabel("确认密码")
         confirm_label.setObjectName("fieldLabel")
         self.register_confirm = QLineEdit()
@@ -150,42 +222,53 @@ class LoginWindow(QWidget):
         
         # 添加到布局
         layout.addLayout(username_layout)
+        layout.addLayout(captcha_layout)
         layout.addLayout(password_layout)
         layout.addLayout(confirm_layout)
         layout.addStretch()
         layout.addWidget(self.register_button)
         
         self.register_tab.setLayout(layout)
+        
+        # 初始生成验证码
+        self.refresh_captcha(None)
+        self.captcha_text = ""  # 存储当前验证码文本
     
-    def login(self):
-        """处理登录逻辑"""
-        username = self.login_username.text()
-        password = self.login_password.text()
-        
-        if not username or not password:
-            QMessageBox.warning(self, "警告", "用户名和密码不能为空!")
-            return
-        
-        user_id = self.db_manager.verify_user(username, password)
-        if user_id:
-            self.open_main_window(user_id, username)
-        else:
-            QMessageBox.warning(self, "登录失败", "用户名或密码错误!")
-            
+    def refresh_captcha(self, event):
+        """刷新验证码"""
+        pixmap, self.captcha_text = generate_captcha_image(generate_captcha_text())
+        self.captcha_image.setPixmap(pixmap)
+    
     def register(self):
         """处理注册逻辑"""
-        username = self.register_username.text()
+        username = self.register_username.text().strip()
         password = self.register_password.text()
         confirm = self.register_confirm.text()
+        captcha = self.register_captcha.text().strip().upper()  # 转为大写比较
         
-        if not username or not password:
-            QMessageBox.warning(self, "警告", "用户名和密码不能为空!")
+        # 基本验证
+        if not username or not password or not captcha:
+            QMessageBox.warning(self, "警告", "所有字段都是必填的!")
             return
-            
+        
+        # 验证密码强度
+        is_valid, message = validate_password_strength(password)
+        if not is_valid:
+            QMessageBox.warning(self, "警告", message)
+            return
+        
+        # 验证两次密码是否一致
         if password != confirm:
             QMessageBox.warning(self, "警告", "两次输入的密码不一致!")
             return
-            
+        
+        # 验证图形验证码
+        if captcha != self.captcha_text:
+            QMessageBox.warning(self, "警告", "验证码错误!")
+            self.refresh_captcha(None)  # 刷新验证码
+            return
+        
+        # 添加用户
         user_id = self.db_manager.add_user(username, password)
         if user_id:
             QMessageBox.information(self, "注册成功", "注册成功，请登录!")
@@ -193,11 +276,53 @@ class LoginWindow(QWidget):
             self.register_username.clear()
             self.register_password.clear()
             self.register_confirm.clear()
+            self.register_captcha.clear()
+            self.refresh_captcha(None)  # 刷新验证码
         else:
             QMessageBox.warning(self, "注册失败", "用户名已存在!")
             
+    def refresh_login_captcha(self, event):
+        """刷新登录验证码"""
+        pixmap, self.login_captcha_text = generate_captcha_image(generate_captcha_text())
+        self.login_captcha_image.setPixmap(pixmap)
+    
+    def login(self):
+        """处理登录逻辑"""
+        username = self.login_username.text().strip()
+        password = self.login_password.text()
+        captcha = self.login_captcha.text().strip().upper()  # 转为大写比较
+        
+        if not username or not password or not captcha:
+            QMessageBox.warning(self, "警告", "所有字段都是必填的!")
+            return
+        
+        # 验证图形验证码
+        if captcha != self.login_captcha_text:
+            QMessageBox.warning(self, "警告", "验证码错误!")
+            self.refresh_login_captcha(None)  # 刷新验证码
+            return
+        
+        user_id = self.db_manager.verify_user(username, password)
+        if user_id:
+            self.open_main_window(user_id, username)
+        else:
+            QMessageBox.warning(self, "登录失败", "用户名或密码错误!")
+            self.refresh_login_captcha(None)  # 登录失败时刷新验证码
+            
     def open_main_window(self, user_id, username):
         """打开主窗口"""
-        self.main_window = MainWindow(user_id, username)
-        self.main_window.show()
-        self.close() 
+        # 检查用户资料是否完整
+        if not self.db_manager.is_profile_complete(user_id):
+            # 如果资料不完整，先打开资料编辑窗口
+            profile_window = ProfileWindow(user_id, username, self.db_manager, is_first_login=True)
+            if profile_window.exec_() == QDialog.Accepted:
+                # 资料已保存，打开主窗口
+                self.main_window = MainWindow(user_id, username, self.db_manager)
+                self.main_window.show()
+                self.close()
+            # 如果用户取消了资料编辑，不做任何操作
+        else:
+            # 资料已完整，直接打开主窗口
+            self.main_window = MainWindow(user_id, username, self.db_manager)
+            self.main_window.show()
+            self.close() 
