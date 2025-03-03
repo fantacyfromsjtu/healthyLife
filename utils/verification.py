@@ -36,28 +36,22 @@ def send_verification_code(phone, code):
     return True 
 
 def generate_captcha_text(length=4):
-    """生成随机验证码文本"""
-    characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    """生成随机验证码文本，使用数字和大写字母，保留一定的混淆性"""
+    # 保留一些混淆字符，但不使用太难区分的
+    characters = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
     return ''.join(random.choices(characters, k=length))
 
 def generate_captcha_image(text, width=160, height=60):
-    """生成更美观的验证码图片"""
-    # 创建图像，使用浅色背景
-    background = random_light_color()
-    image = Image.new('RGB', (width, height), color=background)
+    """生成验证码图片，增加适度干扰但保持可读性"""
+    # 使用随机浅色背景
+    bg_color = (random.randint(230, 245), random.randint(230, 245), random.randint(230, 245))
+    image = Image.new('RGB', (width, height), color=bg_color)
     
     # 创建绘图对象
     draw = ImageDraw.Draw(image)
     
-    # 绘制渐变背景
-    for i in range(0, width, 2):
-        for j in range(height):
-            if random.randint(0, 20) == 5:
-                draw.point((i, j), fill=random_light_color())
-    
-    # 尝试加载字体，如果失败则使用默认字体
+    # 尝试加载字体
     try:
-        # 尝试找到系统字体
         font_paths = [
             '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',  # Linux
             '/System/Library/Fonts/Tahoma.ttf',  # macOS
@@ -71,91 +65,69 @@ def generate_captcha_image(text, width=160, height=60):
                 font_path = path
                 break
                 
-        font_size = random.randint(32, 38)
+        font_size = random.randint(32, 38)  # 稍微随机字体大小
         font = ImageFont.truetype(font_path, font_size) if font_path else ImageFont.load_default()
     except Exception:
         font = ImageFont.load_default()
     
     # 计算文本总宽度以便居中显示
     try:
-        # 新版本 Pillow 的方法 (9.0.0+)
         bbox = font.getbbox(text)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
     except AttributeError:
-        # 旧版本 Pillow 的方法
         text_width, text_height = draw.textsize(text, font=font)
     
-    # 文字起始位置
+    # 计算文字起始位置
     x = (width - text_width) // 2
+    if x < 10:
+        x = 10  # 确保不靠得太左
     y = (height - text_height) // 2
     
-    # 逐个绘制字符，使用不同颜色和角度
+    # 添加背景干扰点
+    for _ in range(60):  # 增加干扰点数量
+        draw.point(
+            (random.randint(0, width), random.randint(0, height)),
+            fill=(random.randint(160, 220), random.randint(160, 220), random.randint(160, 220))
+        )
+    
+    # 添加干扰线
+    for _ in range(3):  # 3条干扰线
+        start = (random.randint(0, width//4), random.randint(0, height))
+        end = (random.randint(3*width//4, width), random.randint(0, height))
+        color = (random.randint(100, 180), random.randint(100, 180), random.randint(100, 180))
+        draw.line([start, end], fill=color, width=1)
+    
+    # 绘制文字 - 每个字符单独绘制，使用不同颜色和轻微旋转
+    char_width = text_width // len(text)
     for i, char in enumerate(text):
-        # 计算每个字符的位置，略微偏移以产生不规则效果
-        char_x = x + i * (text_width // len(text)) + random.randint(-5, 5)
-        char_y = y + random.randint(-5, 5)
+        # 随机深色
+        color = (
+            random.randint(0, 60),
+            random.randint(0, 60),
+            random.randint(0, 60)
+        )
         
-        # 随机旋转角度
-        angle = random.randint(-30, 30)
+        # 轻微偏移
+        char_x = x + i * char_width + random.randint(-3, 3)
+        char_y = y + random.randint(-3, 3)
         
-        # 随机深色（确保与背景对比明显）
-        text_color = random_dark_color()
-        
-        # 创建单个字符图像并旋转
-        char_img = Image.new('RGBA', (text_width // len(text) + 10, text_height + 10), (0, 0, 0, 0))
+        # 创建单个字符图像用于旋转
+        char_img = Image.new('RGBA', (char_width + 10, text_height + 10), (0, 0, 0, 0))
         char_draw = ImageDraw.Draw(char_img)
         
         # 绘制字符
-        try:
-            # 新版本 Pillow
-            char_bbox = font.getbbox(char)
-            char_width = char_bbox[2] - char_bbox[0]
-            char_height = char_bbox[3] - char_bbox[1]
-            char_draw.text(((text_width // len(text) - char_width) // 2 + 5, 5), char, font=font, fill=text_color)
-        except AttributeError:
-            # 旧版本 Pillow
-            char_draw.text((5, 5), char, font=font, fill=text_color)
+        char_draw.text((5, 5), char, font=font, fill=color)
         
-        # 旋转字符
-        rotated_char = char_img.rotate(angle, expand=1, resample=Image.BICUBIC)
+        # 轻微旋转（角度较小）
+        angle = random.randint(-10, 10)  # 较小的旋转角度
+        rotated = char_img.rotate(angle, expand=1, resample=Image.BICUBIC)
         
         # 粘贴到主图像
-        image.paste(rotated_char, (char_x, char_y), rotated_char)
+        image.paste(rotated, (char_x, char_y), rotated)
     
-    # 添加干扰线
-    for _ in range(random.randint(3, 6)):
-        start_x = random.randint(0, width // 4)
-        start_y = random.randint(0, height)
-        end_x = random.randint(3 * width // 4, width)
-        end_y = random.randint(0, height)
-        
-        # 曲线控制点
-        control_x = random.randint(width // 4, 3 * width // 4)
-        control_y = random.randint(0, height)
-        
-        # 随机线条颜色
-        line_color = random_dark_color()
-        line_width = random.randint(1, 2)
-        
-        # 绘制贝塞尔曲线
-        for t in range(0, 100, 2):
-            t /= 100
-            # 二次贝塞尔曲线
-            x = int((1-t)**2 * start_x + 2*(1-t)*t*control_x + t**2*end_x)
-            y = int((1-t)**2 * start_y + 2*(1-t)*t*control_y + t**2*end_y)
-            
-            if 0 <= x < width and 0 <= y < height:
-                # 绘制粗线条
-                for dx in range(-line_width, line_width+1):
-                    for dy in range(-line_width, line_width+1):
-                        if dx*dx + dy*dy <= line_width*line_width:
-                            px, py = x + dx, y + dy
-                            if 0 <= px < width and 0 <= py < height:
-                                draw.point((px, py), fill=line_color)
-    
-    # 轻微扭曲整个图像
-    image = apply_wave_distortion(image)
+    # 添加波形扭曲（程度较轻）
+    image = apply_wave_distortion(image, amplitude=2.0)  # 使用较小的振幅
     
     # 将PIL图像转换为QPixmap
     buffer = BytesIO()
@@ -181,8 +153,8 @@ def random_dark_color():
     b = random.randint(0, 100)
     return (r, g, b)
 
-def apply_wave_distortion(image, amplitude=4.0):
-    """应用波浪扭曲效果"""
+def apply_wave_distortion(image, amplitude=2.0):
+    """应用轻微的波浪扭曲效果"""
     width, height = image.size
     new_img = Image.new('RGB', (width, height))
     
@@ -193,18 +165,8 @@ def apply_wave_distortion(image, amplitude=4.0):
             # 垂直波动
             offset_y = int(amplitude * math.cos(i / width * 2 * math.pi))
             
-            src_x = i + offset_x
-            src_y = j + offset_y
-            
-            # 确保坐标在有效范围内
-            if src_x >= width:
-                src_x = width - 1
-            if src_x < 0:
-                src_x = 0
-            if src_y >= height:
-                src_y = height - 1
-            if src_y < 0:
-                src_y = 0
+            src_x = min(max(i + offset_x, 0), width - 1)
+            src_y = min(max(j + offset_y, 0), height - 1)
                 
             # 复制像素
             new_img.putpixel((i, j), image.getpixel((src_x, src_y)))

@@ -4,6 +4,7 @@ from ui.login import LoginWindow
 import logging
 import os
 from utils.style_helper import load_stylesheet
+from database.db_manager import DatabaseManager
 
 # 在main.py顶部添加
 logging.basicConfig(
@@ -19,6 +20,12 @@ def main():
     style_path = "resources/styles/style.qss"
     if os.path.exists(style_path):
         app.setStyleSheet(load_stylesheet(style_path))
+    
+    # 初始化数据库管理器
+    db_manager = DatabaseManager()
+    
+    # 初始化食物数据库
+    db_manager.initialize_food_database()
     
     login_window = LoginWindow()
     login_window.show()

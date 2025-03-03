@@ -287,27 +287,36 @@ class LoginWindow(QWidget):
         self.login_captcha_image.setPixmap(pixmap)
     
     def login(self):
-        """处理登录逻辑"""
+        """登录验证"""
         username = self.login_username.text().strip()
-        password = self.login_password.text()
-        captcha = self.login_captcha.text().strip().upper()  # 转为大写比较
+        password = self.login_password.text().strip()
         
-        if not username or not password or not captcha:
-            QMessageBox.warning(self, "警告", "所有字段都是必填的!")
+        if not username or not password:
+            QMessageBox.warning(self, "警告", "用户名和密码不能为空！")
             return
         
-        # 验证图形验证码
-        if captcha != self.login_captcha_text:
-            QMessageBox.warning(self, "警告", "验证码错误!")
-            self.refresh_login_captcha(None)  # 刷新验证码
-            return
+        # 创建数据库连接
+        db_manager = DatabaseManager()
+        user_id = db_manager.validate_user(username, password)
         
-        user_id = self.db_manager.verify_user(username, password)
         if user_id:
-            self.open_main_window(user_id, username)
+            QMessageBox.information(self, "成功", f"欢迎回来，{username}！")
+            self.hide()
+            
+            # 检查用户是否已完善个人信息（首次登录判断）
+            user_data = db_manager.get_user_profile(user_id)
+            is_first_login = not user_data.get("gender") and not user_data.get("age")
+            
+            # 如果是首次登录，先打开个人信息窗口
+            if is_first_login:
+                profile_window = ProfileWindow(user_id, username, db_manager, is_first_login=True)
+                profile_window.exec_()
+            
+            # 打开主窗口
+            self.main_window = MainWindow(user_id, username, db_manager)
+            self.main_window.show()
         else:
-            QMessageBox.warning(self, "登录失败", "用户名或密码错误!")
-            self.refresh_login_captcha(None)  # 登录失败时刷新验证码
+            QMessageBox.warning(self, "错误", "用户名或密码不正确！")
             
     def open_main_window(self, user_id, username):
         """打开主窗口"""

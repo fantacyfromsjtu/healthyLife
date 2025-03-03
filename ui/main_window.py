@@ -1,8 +1,9 @@
 from PyQt5.QtWidgets import (QMainWindow, QCalendarWidget, QVBoxLayout, QHBoxLayout, 
                             QWidget, QPushButton, QLabel, QComboBox, QStackedWidget,
-                            QAction, QToolBar, QMessageBox, QFrame)
+                            QAction, QToolBar, QMessageBox, QFrame, QTabWidget)
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
+from ui.diet_view import DietView
 
 class MainWindow(QMainWindow):
     def __init__(self, user_id, username, db_manager):
@@ -104,14 +105,17 @@ class MainWindow(QMainWindow):
         self.content_stack = QStackedWidget()
         self.content_stack.setObjectName("contentStack")
         
+        # 在选项卡布局中添加饮食记录视图
+        self.tab_widget = QTabWidget()
+        
+        # 饮食记录标签页
+        self.diet_view = DietView(self.user_id, self.db_manager)
+        self.tab_widget.addTab(self.diet_view, "饮食记录")
+        
         # 创建不同的内容视图
         self.all_view = QLabel("全部内容视图")
         self.all_view.setAlignment(Qt.AlignCenter)
         self.all_view.setObjectName("contentView")
-        
-        self.diet_view = QLabel("饮食内容视图")
-        self.diet_view.setAlignment(Qt.AlignCenter)
-        self.diet_view.setObjectName("contentView")
         
         self.exercise_view = QLabel("运动内容视图")
         self.exercise_view.setAlignment(Qt.AlignCenter)
@@ -131,6 +135,7 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(self.sleep_view)
         self.content_stack.addWidget(self.plan_view)
         
+        right_layout.addWidget(self.tab_widget)
         right_layout.addWidget(self.content_stack)
         
         # 将左右区域添加到主布局
