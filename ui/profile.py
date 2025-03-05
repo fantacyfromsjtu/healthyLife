@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont
 
 
@@ -312,8 +312,11 @@ class ProfileWindow(QDialog):
                 sleep_habit,
             ):
                 QMessageBox.information(self, "成功", "个人资料保存成功！")
+                # 发出信号通知资料已更新
+                print(f"发出profile_updated信号: user_id={self.user_id}, username={self.username}")
                 self.profile_updated.emit(self.user_id, self.username)
-                self.accept()
+                # 延迟关闭窗口，确保信号有时间处理
+                QTimer.singleShot(200, self.accept)
             else:
                 QMessageBox.warning(self, "错误", "保存个人资料时出现错误！")
         except Exception as e:

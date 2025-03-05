@@ -1,9 +1,8 @@
 from PyQt5.QtWidgets import (QWidget, QPushButton, QLineEdit, QLabel, 
                             QVBoxLayout, QHBoxLayout, QMessageBox, QTabWidget,
                             QFrame, QDialog)
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QPixmap
-from PyQt5.QtCore import QTimer
 
 from database.db_manager import DatabaseManager
 from ui.main_window import MainWindow
@@ -287,51 +286,111 @@ class LoginWindow(QWidget):
         self.login_captcha_image.setPixmap(pixmap)
     
     def login(self):
-        """登录验证"""
+        """用户登录"""
         username = self.login_username.text().strip()
         password = self.login_password.text().strip()
+        captcha = self.login_captcha.text().strip()
         
-        if not username or not password:
-            QMessageBox.warning(self, "警告", "用户名和密码不能为空！")
+        # 验证输入
+        if not username:
+            QMessageBox.warning(self, "警告", "请输入用户名!")
+            return
+        if not password:
+            QMessageBox.warning(self, "警告", "请输入密码!")
+            return
+        if not captcha:
+            QMessageBox.warning(self, "警告", "请输入验证码!")
+            return
+        if captcha.lower() != self.login_captcha_text.lower():
+            QMessageBox.warning(self, "警告", "验证码错误!")
+            self.login_captcha.clear()
+            self.refresh_login_captcha(None)
             return
         
-        # 创建数据库连接
-        db_manager = DatabaseManager()
-        user_id = db_manager.verify_user(username, password)
-        
-        if user_id:
-            QMessageBox.information(self, "成功", f"欢迎回来，{username}！")
-            self.hide()
+        # 验证用户登录
+        try:
+            # 创建数据库连接
+            if not hasattr(self, 'db_manager'):
+                try:
+                    from database.db_manager import DatabaseManager
+                    self.db_manager = DatabaseManager('database/health_life.db')
+                    print("已创建数据库连接")
+                except Exception as e:
+                    QMessageBox.critical(self, "错误", f"无法连接数据库: {str(e)}")
+                    return
             
-            # 检查用户是否已完善个人信息（首次登录判断）
-            user_data = db_manager.get_user_profile(user_id)
-            is_first_login = not user_data.get("gender") and not user_data.get("age")
-            
-            # 如果是首次登录，先打开个人信息窗口
-            if is_first_login:
-                profile_window = ProfileWindow(user_id, username, db_manager, is_first_login=True)
-                profile_window.exec_()
-            
-            # 打开主窗口
-            self.main_window = MainWindow(user_id, username, db_manager)
-            self.main_window.show()
-        else:
-            QMessageBox.warning(self, "错误", "用户名或密码不正确！")
-            
+            user_id = self.db_manager.verify_user(username, password)
+            if user_id:
+                print(f"用户登录成功: {username}, ID: {user_id}")
+                
+                # 检查用户资料是否完整
+                try:
+                    user_data = self.db_manager.get_user_profile(user_id)
+                    print(f"获取到用户资料: {user_data}")
+                    
+                    # 防止None值导致的错误
+                    if user_data is None:
+                        print("用户资料为None，创建空字典")
+                        user_data = {}
+                    
+                    # 使用get方法安全地获取可能不存在的键的值
+                    is_first_login = not user_data.get("gender") and not user_data.get("age")
+                    print(f"是否首次登录: {is_first_login}")
+                    
+                    if is_first_login:
+                        from ui.profile import ProfileWindow
+                        profile_window = ProfileWindow(user_id, username, self.db_manager, True)
+                        # 直接连接信号到我们自己的方法而不是open_main_window
+                        profile_window.profile_updated.connect(lambda uid, uname: self.handle_profile_updated(uid, uname))
+                        profile_window.exec_()
+                    else:
+                        self.open_main_window(user_id, username)
+                except Exception as e:
+                    print(f"处理用户资料时出错: {str(e)}")
+                    QMessageBox.warning(self, "警告", f"登录过程中发生错误: {str(e)}")
+                    # 尽管发生错误，仍尝试打开主窗口
+                    self.open_main_window(user_id, username)
+            else:
+                QMessageBox.warning(self, "警告", "用户名或密码错误!")
+                self.login_password.clear()
+                self.login_captcha.clear()
+                self.refresh_login_captcha(None)
+        except Exception as e:
+            print(f"登录过程发生异常: {str(e)}")
+            QMessageBox.critical(self, "错误", f"登录过程中发生错误: {str(e)}")
+            self.refresh_login_captcha(None)
+    
+    def handle_profile_updated(self, user_id, username):
+        """处理用户资料更新后的操作"""
+        print(f"用户资料已更新，准备打开主窗口: {username} (ID: {user_id})")
+        # 确保信号处理完成后打开主窗口
+        QTimer.singleShot(100, lambda: self.open_main_window(user_id, username))
+    
     def open_main_window(self, user_id, username):
         """打开主窗口"""
+        print(f"正在打开主窗口: {username} (ID: {user_id})")
+        # 直接导入MainWindow，避免循环导入
+        from ui.main_window import MainWindow
+        
         # 检查用户资料是否完整
-        if not self.db_manager.is_profile_complete(user_id):
+        profile_complete = self.db_manager.is_profile_complete(user_id)
+        print(f"用户资料是否完整: {profile_complete}")
+        
+        if not profile_complete:
             # 如果资料不完整，先打开资料编辑窗口
+            from ui.profile import ProfileWindow
             profile_window = ProfileWindow(user_id, username, self.db_manager, is_first_login=True)
-            if profile_window.exec_() == QDialog.Accepted:
-                # 资料已保存，打开主窗口
-                self.main_window = MainWindow(user_id, username, self.db_manager)
-                self.main_window.show()
-                self.close()
-            # 如果用户取消了资料编辑，不做任何操作
+            profile_window.profile_updated.connect(lambda uid, uname: self.handle_profile_updated(uid, uname))
+            profile_window.exec_()
         else:
             # 资料已完整，直接打开主窗口
-            self.main_window = MainWindow(user_id, username, self.db_manager)
-            self.main_window.show()
-            self.close() 
+            try:
+                print("正在创建主窗口实例...")
+                self.main_window = MainWindow(user_id, username, self.db_manager)
+                print("正在显示主窗口...")
+                self.main_window.show()
+                print("关闭登录窗口...")
+                self.close()
+            except Exception as e:
+                print(f"打开主窗口失败: {str(e)}")
+                QMessageBox.critical(self, "错误", f"打开主窗口时发生错误: {str(e)}") 

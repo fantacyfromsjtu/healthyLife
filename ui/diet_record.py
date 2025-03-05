@@ -2,7 +2,8 @@ from PyQt5.QtWidgets import (QDialog, QLabel, QComboBox, QLineEdit, QTextEdit,
                            QPushButton, QVBoxLayout, QHBoxLayout, QFormLayout, 
                            QDateEdit, QTimeEdit, QDoubleSpinBox, QTableWidget, 
                            QTableWidgetItem, QHeaderView, QFrame, QTabWidget,
-                           QWidget, QMessageBox, QCompleter, QGroupBox, QCheckBox)
+                           QWidget, QMessageBox, QCompleter, QGroupBox, QCheckBox,
+                           QInputDialog)
 from PyQt5.QtCore import Qt, QDate, QTime, pyqtSignal
 from PyQt5.QtGui import QFont
 
@@ -81,14 +82,42 @@ class DietRecordDialog(QDialog):
         self.category_combo.addItem("全部")
         
         # 获取所有食物分类
-        categories = set()
-        foods = self.db_manager.get_foods_by_category()
-        for food in foods:
-            if food[2]:  # 分类在索引2
-                categories.add(food[2])
-        
-        for category in sorted(categories):
-            self.category_combo.addItem(category)
+        try:
+            # 确保数据库中有食物数据
+            self.db_manager.initialize_food_database()
+            
+            # 获取分类
+            categories = set()
+            foods = self.db_manager.get_foods_by_category()
+            print(f"从数据库获取食物数据: {len(foods)}条记录")
+            
+            if not foods or len(foods) == 0:
+                # 如果数据库中没有数据，显示错误消息
+                QMessageBox.warning(self, "警告", "无法加载食物数据，请确保数据库已正确初始化。")
+                print("警告: 无法从数据库加载食物数据")
+            else:
+                for food in foods:
+                    if food[2]:  # 分类在索引2
+                        categories.add(food[2])
+                
+                print(f"找到的食物分类: {categories}")
+                
+                # 如果没有分类，添加一些默认分类
+                if not categories:
+                    default_categories = ["主食", "肉类", "蔬菜", "水果", "乳制品", "豆制品", "零食"]
+                    for cat in default_categories:
+                        self.category_combo.addItem(cat)
+                    print(f"使用默认分类: {default_categories}")
+                else:
+                    for category in sorted(categories):
+                        self.category_combo.addItem(category)
+        except Exception as e:
+            print(f"加载食物分类时出错: {str(e)}")
+            # 添加一些默认分类
+            default_categories = ["主食", "肉类", "蔬菜", "水果", "乳制品", "豆制品", "零食"]
+            for cat in default_categories:
+                self.category_combo.addItem(cat)
+            print(f"使用默认分类: {default_categories}")
         
         self.category_combo.currentIndexChanged.connect(self.filter_by_category)
         
@@ -107,7 +136,7 @@ class DietRecordDialog(QDialog):
         self.food_table.cellClicked.connect(self.food_selected)
         
         # 填充食物表格
-        self.populate_food_table(foods)
+        self.populate_food_table(foods if 'foods' in locals() else [])
         
         # 数量和单位
         amount_layout = QHBoxLayout()
@@ -128,6 +157,11 @@ class DietRecordDialog(QDialog):
         amount_layout.addWidget(self.unit_combo)
         amount_layout.addStretch()
         
+        # 添加食物按钮
+        add_food_button = QPushButton("添加食物")
+        add_food_button.setObjectName("secondaryButton")
+        add_food_button.clicked.connect(self.add_new_food)
+        
         # 备注
         notes_layout = QVBoxLayout()
         notes_label = QLabel("备注:")
@@ -142,6 +176,7 @@ class DietRecordDialog(QDialog):
         food_layout.addLayout(category_layout)
         food_layout.addWidget(self.food_table)
         food_layout.addLayout(amount_layout)
+        food_layout.addWidget(add_food_button)
         food_layout.addLayout(notes_layout)
         food_group.setLayout(food_layout)
         
@@ -256,4 +291,76 @@ class DietRecordDialog(QDialog):
             self.record_added.emit()  # 发射记录添加信号
             self.accept()
         else:
-            QMessageBox.warning(self, "错误", "保存记录失败，请重试！") 
+            QMessageBox.warning(self, "错误", "保存记录失败，请重试！")
+    
+    def add_new_food(self):
+        """添加新的食物到数据库"""
+        try:
+            # 获取食物名称
+            food_name, ok = QInputDialog.getText(self, "添加新食物", "食物名称:")
+            if not ok or not food_name.strip():
+                return
+                
+            # 获取食物分类
+            categories = [self.category_combo.itemText(i) for i in range(1, self.category_combo.count())]
+            if not categories:
+                categories = ["主食", "肉类", "蔬菜", "水果", "乳制品", "豆制品", "零食"]
+                
+            category, ok = QInputDialog.getItem(self, "选择分类", "食物分类:", categories, 0, False)
+            if not ok:
+                return
+                
+            # 获取食物热量
+            calories, ok = QInputDialog.getDouble(self, "食物热量", "每100克热量(kcal):", 100, 0, 1000, 1)
+            if not ok:
+                return
+                
+            # 获取蛋白质含量
+            protein, ok = QInputDialog.getDouble(self, "蛋白质含量", "每100克蛋白质(g):", 5, 0, 100, 1)
+            if not ok:
+                return
+                
+            # 获取脂肪含量
+            fat, ok = QInputDialog.getDouble(self, "脂肪含量", "每100克脂肪(g):", 5, 0, 100, 1)
+            if not ok:
+                return
+                
+            # 获取碳水含量
+            carbs, ok = QInputDialog.getDouble(self, "碳水化合物含量", "每100克碳水(g):", 10, 0, 100, 1)
+            if not ok:
+                return
+                
+            # 获取膳食纤维含量
+            fiber, ok = QInputDialog.getDouble(self, "膳食纤维含量", "每100克膳食纤维(g):", 2, 0, 50, 1)
+            if not ok:
+                return
+                
+            # 获取标准单位
+            units = ["份", "克", "ml", "个", "碗", "杯"]
+            unit, ok = QInputDialog.getItem(self, "标准单位", "选择标准单位:", units, 0, False)
+            if not ok:
+                return
+                
+            # 获取标准重量
+            standard_weight, ok = QInputDialog.getDouble(self, "标准重量", f"一{unit}的重量(克):", 100, 1, 1000, 1)
+            if not ok:
+                return
+                
+            # 添加到数据库
+            success = self.db_manager.add_food(food_name, category, calories, protein, fat, carbs, fiber, unit, standard_weight)
+            
+            if success:
+                QMessageBox.information(self, "成功", f"已添加食物: {food_name}")
+                
+                # 刷新食物列表
+                self.filter_by_category()
+                
+                # 如果当前分类是新添加食物的分类，选择该食物
+                if self.category_combo.currentText() == category or self.category_combo.currentText() == "全部":
+                    self.search_input.setText(food_name)
+            else:
+                QMessageBox.warning(self, "失败", "添加食物失败，请重试。")
+                
+        except Exception as e:
+            print(f"添加食物时出错: {str(e)}")
+            QMessageBox.warning(self, "错误", f"添加食物时出错: {str(e)}") 

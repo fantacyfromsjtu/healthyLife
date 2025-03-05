@@ -1,9 +1,10 @@
 from PyQt5.QtWidgets import (QMainWindow, QCalendarWidget, QVBoxLayout, QHBoxLayout, 
                             QWidget, QPushButton, QLabel, QComboBox, QStackedWidget,
-                            QAction, QToolBar, QMessageBox, QFrame, QTabWidget, QInputDialog)
+                            QAction, QToolBar, QMessageBox, QFrame, QTabWidget, QInputDialog, QMenu)
 from PyQt5.QtCore import Qt, QDate
-from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
+from PyQt5.QtGui import QIcon, QFont, QColor, QPalette, QCursor
 from ui.diet_view import DietView
+from ui.exercise_view import ExerciseView
 
 # 导入其他需要的视图类
 # 为缺少的视图创建基本视图类
@@ -38,9 +39,21 @@ class BaseView(QWidget):
         self.setLayout(layout)
     
     def update_date(self, selected_date):
-        """更新日期"""
-        self.selected_date = selected_date
-        self.content_label.setText(f"日期: {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+        """更新视图显示的日期"""
+        try:
+            # 检查日期类型，如果是字符串则转换为QDate
+            if isinstance(selected_date, str):
+                q_date = QDate.fromString(selected_date, "yyyy-MM-dd")
+                date_str = selected_date
+            else:
+                q_date = selected_date
+                date_str = selected_date.toString("yyyy-MM-dd")
+                
+            # 更新内容
+            self.content_label.setText(f"日期: {date_str}\n暂无数据")
+        except Exception as e:
+            print(f"更新日期出错: {str(e)}")
+            self.content_label.setText("日期显示出错")
     
     def load_data(self):
         """加载数据，子类应重写此方法"""
@@ -58,21 +71,18 @@ class AllView(BaseView):
     def update_date(self, selected_date):
         """更新日期"""
         super().update_date(selected_date)
-        self.content_label.setText(f"全部内容 - {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+        
+        # 检查日期类型，如果是字符串则使用原样显示
+        if isinstance(selected_date, str):
+            date_str = selected_date
+        else:
+            date_str = selected_date.toString('yyyy-MM-dd')
+            
+        self.content_label.setText(f"全部内容 - {date_str}\n暂无数据")
 
-
-class ExerciseView(BaseView):
-    """运动记录视图"""
-    
-    def init_ui(self):
-        """初始化用户界面"""
-        super().init_ui()
-        self.title_label.setText("运动记录")
-    
-    def update_date(self, selected_date):
-        """更新日期"""
-        super().update_date(selected_date)
-        self.content_label.setText(f"运动记录 - {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+    def update_summary(self, summary_text):
+        """更新摘要内容"""
+        self.content_label.setText(summary_text)
 
 
 class SleepView(BaseView):
@@ -86,7 +96,14 @@ class SleepView(BaseView):
     def update_date(self, selected_date):
         """更新日期"""
         super().update_date(selected_date)
-        self.content_label.setText(f"睡眠记录 - {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+        
+        # 检查日期类型，如果是字符串则使用原样显示
+        if isinstance(selected_date, str):
+            date_str = selected_date
+        else:
+            date_str = selected_date.toString('yyyy-MM-dd')
+            
+        self.content_label.setText(f"睡眠记录 - {date_str}\n暂无数据")
 
 
 class PlanView(BaseView):
@@ -96,11 +113,80 @@ class PlanView(BaseView):
         """初始化用户界面"""
         super().init_ui()
         self.title_label.setText("计划安排")
+        
+        # 创建一个布局来显示提醒列表
+        layout = self.layout()
+        
+        # 添加一个标签用于显示提醒列表
+        self.reminder_label = QLabel("暂无提醒计划")
+        self.reminder_label.setWordWrap(True)
+        self.reminder_label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.reminder_label.setObjectName("reminderLabel")
+        layout.addWidget(self.reminder_label)
+        
+        # 替换原有的默认内容标签
+        layout.removeWidget(self.content_label)
+        self.content_label.hide()
     
     def update_date(self, selected_date):
         """更新日期"""
         super().update_date(selected_date)
-        self.content_label.setText(f"计划安排 - {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+        
+        # 检查日期类型，如果是字符串则使用原样显示
+        if isinstance(selected_date, str):
+            date_str = selected_date
+            self.current_date = date_str
+        else:
+            date_str = selected_date.toString('yyyy-MM-dd')
+            self.current_date = date_str
+        
+        self.title_label.setText(f"计划安排 - {date_str}")
+        
+        # 加载该日期的提醒数据
+        self.load_reminders()
+    
+    def load_reminders(self):
+        """加载提醒数据"""
+        try:
+            # 检查是否已设置当前日期
+            if not hasattr(self, 'current_date'):
+                self.current_date = QDate.currentDate().toString('yyyy-MM-dd')
+            
+            # 从数据库加载提醒
+            reminders = self.db_manager.get_reminders_by_user_date(self.user_id, self.current_date)
+            
+            if not reminders or len(reminders) == 0:
+                self.reminder_label.setText(f"日期: {self.current_date}\n\n暂无提醒计划")
+                return
+            
+            # 构建提醒文本
+            reminder_text = f"<h3>日期: {self.current_date}</h3>"
+            reminder_text += "<ul>"
+            
+            for reminder in reminders:
+                # 获取提醒数据
+                reminder_id = reminder[0]
+                reminder_time = reminder[3]  # 时间
+                reminder_type = reminder[4]  # 类型
+                reminder_content = reminder[5]  # 内容
+                is_completed = reminder[6]  # 是否完成
+                
+                # 根据完成状态设置样式
+                status = "✓" if is_completed else "○"
+                style = "text-decoration: line-through; color: gray;" if is_completed else ""
+                
+                reminder_text += f'<li style="{style}"><b>{reminder_time}</b> - {reminder_type}: {reminder_content} {status}</li>'
+            
+            reminder_text += "</ul>"
+            self.reminder_label.setText(reminder_text)
+            
+        except Exception as e:
+            print(f"加载提醒数据出错: {str(e)}")
+            self.reminder_label.setText(f"日期: {self.current_date}\n\n加载提醒数据出错")
+    
+    def load_data(self):
+        """加载数据"""
+        self.load_reminders()
 
 
 class MainWindow(QMainWindow):
@@ -226,6 +312,9 @@ class MainWindow(QMainWindow):
         # 创建菜单和工具栏
         self.create_menus()
         
+        # 初始化加载周报数据
+        self.update_weekly_summary()
+        
     def create_menus(self):
         """创建菜单和工具栏"""
         # 文件菜单
@@ -293,79 +382,160 @@ class MainWindow(QMainWindow):
     def update_current_view(self):
         """更新当前显示的视图"""
         current_index = self.content_stack.currentIndex()
-        current_view = self.content_stack.widget(current_index)
         
-        # 如果是DietView，特殊处理
-        if isinstance(current_view, DietView):
-            if hasattr(current_view, 'date_edit'):
-                current_view.date_edit.setDate(self.calendar.selectedDate())
-                current_view.load_diet_records()
-        # 其他视图使用标准的update_date方法
-        elif hasattr(current_view, 'update_date'):
-            current_view.update_date(self.calendar.selectedDate())
+        # 获取当前QDate对象和它的字符串表示
+        selected_qdate = self.calendar.selectedDate()
+        selected_date = selected_qdate.toString("yyyy-MM-dd")
+        
+        # 获取当前视图
+        current_view = self.content_stack.currentWidget()
+        
+        print(f"更新视图: current_index={current_index}, 视图类型={type(current_view).__name__}")
+        
+        # 检查当前视图类型并调用适当的方法
+        from ui.diet_view import DietView
+        
+        if hasattr(current_view, 'update_date'):
+            # 通用视图更新方法 - 传递字符串格式的日期
+            current_view.update_date(selected_date)
+        elif isinstance(current_view, DietView):
+            # DietView特殊处理
+            print("检测到DietView，使用特殊更新方法")
+            try:
+                if hasattr(current_view, 'date_edit'):
+                    # 使用QDate对象设置date_edit
+                    current_view.date_edit.setDate(selected_qdate)
+                    # 加载相应的饮食记录
+                    current_view.load_diet_records()
+            except Exception as e:
+                print(f"更新DietView时出错: {str(e)}")
+        else:
+            print(f"警告: 未知的视图类型 {type(current_view).__name__}，无法更新")
             
     def load_date_data(self):
-        """加载所选日期的数据"""
-        selected_date = self.calendar.selectedDate()
+        """加载当前选择日期的数据"""
+        self.update_current_view()
         
-        # 更新所有视图的日期
-        self.all_view.update_date(selected_date)
+        # 获取当前日期
+        selected_date = self.calendar.selectedDate().toString("yyyy-MM-dd")
         
-        # DietView 需要特殊处理，因为它有自己的日期控件
-        if hasattr(self.diet_view, 'date_edit'):
-            self.diet_view.date_edit.setDate(selected_date)
+        # 根据当前显示的视图类型，加载相应数据
+        current_index = self.content_stack.currentIndex()
+        current_view = self.content_stack.currentWidget()
+        
+        print(f"加载日期数据: 日期={selected_date}, 视图索引={current_index}")
+        
+        # 尝试调用视图的load_data方法（如果存在）
+        if hasattr(current_view, 'load_data'):
+            try:
+                current_view.load_data()
+                print(f"已调用 {type(current_view).__name__}.load_data()")
+            except Exception as e:
+                print(f"调用load_data出错: {str(e)}")
+                
+        # 特殊处理各种视图类型
+        if current_index == 1 and hasattr(self.diet_view, 'load_diet_records'):  # 饮食视图
             self.diet_view.load_diet_records()
-        
-        # 更新其他视图
-        self.exercise_view.update_date(selected_date)
-        self.sleep_view.update_date(selected_date)
-        self.plan_view.update_date(selected_date)
+        elif current_index == 2 and hasattr(self.exercise_view, 'load_exercise_records'):  # 运动视图
+            self.exercise_view.load_exercise_records()
+        elif current_index == 4 and hasattr(self.plan_view, 'load_reminders'):  # 计划视图
+            self.plan_view.load_reminders()
         
     def add_record(self):
         """添加记录"""
-        current_index = self.mode_combo.currentIndex()
+        current_index = self.content_stack.currentIndex()
+        print(f"添加记录: 当前视图索引 = {current_index}")
         
-        if current_index == 0:  # 全部模式
-            # 弹出选择对话框让用户选择要添加的记录类型
-            record_types = ["饮食记录", "运动记录", "睡眠记录"]
-            selected_type, ok = QInputDialog.getItem(
-                self, "选择记录类型", "请选择要添加的记录类型:", 
-                record_types, 0, False
-            )
-            if not ok:
-                return
+        # 根据当前视图索引决定添加什么类型的记录
+        if current_index == 0:  # 全部视图
+            # 显示一个选项菜单让用户选择要添加的记录类型
+            menu = QMenu(self)
+            diet_action = menu.addAction("添加饮食记录")
+            exercise_action = menu.addAction("添加运动记录")
+            plan_action = menu.addAction("添加计划提醒")
+            
+            diet_action.triggered.connect(self.add_diet_record)
+            exercise_action.triggered.connect(self.add_exercise_record)
+            plan_action.triggered.connect(self.add_plan)
+            
+            # 在按钮位置显示菜单
+            button = self.sender()
+            if button:
+                menu.exec_(button.mapToGlobal(button.rect().bottomLeft()))
+            else:
+                menu.exec_(QCursor.pos())
                 
-            if selected_type == "饮食记录":
-                self.add_diet_record()
-            elif selected_type == "运动记录":
-                QMessageBox.information(self, "提示", "添加运动记录功能正在开发中...")
-            elif selected_type == "睡眠记录":
-                QMessageBox.information(self, "提示", "添加睡眠记录功能正在开发中...")
-        
-        elif current_index == 1:  # 饮食模式
+        elif current_index == 1:  # 饮食视图
             self.add_diet_record()
-        elif current_index == 2:  # 运动模式
-            QMessageBox.information(self, "提示", "添加运动记录功能正在开发中...")
-        elif current_index == 3:  # 睡眠模式
-            QMessageBox.information(self, "提示", "添加睡眠记录功能正在开发中...")
-        elif current_index == 4:  # 计划模式
+        elif current_index == 2:  # 运动视图
+            self.add_exercise_record()
+        elif current_index == 3:  # 睡眠视图
+            # 这里可以添加睡眠记录功能
+            QMessageBox.information(self, "提示", "睡眠记录功能暂未实现")
+        elif current_index == 4:  # 计划视图
             self.add_plan()
+        else:
+            print(f"未知的视图索引: {current_index}")
+            QMessageBox.warning(self, "错误", "无法确定要添加的记录类型")
     
     def add_diet_record(self):
         """添加饮食记录"""
         if hasattr(self.diet_view, 'add_diet_record'):
             self.diet_view.add_diet_record()
+            # 在添加完成后自动刷新视图
+            def refresh_views():
+                self.diet_view.load_diet_records()
+                self.load_date_data()
+            
+            # 尝试连接信号
+            if hasattr(self.diet_view, 'records_updated'):
+                self.diet_view.records_updated.connect(refresh_views)
         else:
             from ui.diet_record import DietRecordDialog
-            dialog = DietRecordDialog(self.user_id, self.db_manager)
-            dialog.record_added.connect(lambda: self.diet_view.load_diet_records())
+            dialog = DietRecordDialog(self.user_id, self.db_manager, self)
+            
+            # 在记录添加后刷新视图
+            def on_record_added():
+                self.diet_view.load_diet_records()
+                self.load_date_data()
+                
+            dialog.record_added.connect(on_record_added)
             dialog.exec_()
+        
+    def add_exercise_record(self):
+        """添加运动记录"""
+        from ui.exercise_record import ExerciseRecordDialog
+        dialog = ExerciseRecordDialog(self.user_id, self.db_manager, self)
+        
+        # 在记录添加后刷新视图
+        def on_record_added():
+            self.exercise_view.load_exercise_records()
+            self.load_date_data()
+            # 更新每周摘要
+            self.update_weekly_summary()
+            
+        dialog.record_added.connect(on_record_added)
+        dialog.exec_()
         
     def add_plan(self):
         """添加提醒计划"""
         from ui.reminder import ReminderDialog
         dialog = ReminderDialog(self.db_manager, self.user_id, self)
-        dialog.reminder_updated.connect(self.load_date_data)
+        
+        # 当提醒更新时，更新计划视图和当前视图
+        def on_reminder_updated():
+            # 更新计划视图
+            if hasattr(self.plan_view, 'load_reminders'):
+                self.plan_view.load_reminders()
+            
+            # 更新当前视图
+            self.load_date_data()
+            
+            # 如果当前是计划视图，还需要额外刷新
+            if self.content_stack.currentIndex() == 4:  # 计划视图索引
+                self.mode_changed(4)
+                
+        dialog.reminder_updated.connect(on_reminder_updated)
         dialog.exec_()
         
     def export_report(self):
@@ -391,10 +561,72 @@ class MainWindow(QMainWindow):
         
     def show_weekly_report(self):
         """显示每周报告"""
-        QMessageBox.information(self, "提示", "每周报告功能正在开发中...")
+        try:
+            # 更新周报摘要
+            self.update_weekly_summary()
+            
+            # 切换到全部模式显示周报
+            self.mode_combo.setCurrentIndex(0)  # 全部模式
+            
+            QMessageBox.information(self, "周报", "周报已生成并在全部模式中显示！")
+        except Exception as e:
+            QMessageBox.warning(self, "错误", f"生成周报时出错: {str(e)}")
         
     def view_reminders(self):
         """查看所有提醒"""
         from ui.reminder import ReminderView
         self.reminder_view = ReminderView(self.user_id, self.db_manager, self)
-        self.reminder_view.show() 
+        self.reminder_view.show()
+
+    def update_weekly_summary(self):
+        """更新每周运动和饮食总结"""
+        try:
+            print("更新每周总结...")
+            # 获取当前周的开始和结束日期
+            today = QDate.currentDate()
+            days_to_sunday = today.dayOfWeek() % 7  # 周日为0，周一为1，...，周六为6
+            start_date = today.addDays(-days_to_sunday).toString("yyyy-MM-dd")
+            end_date = today.addDays(6 - days_to_sunday).toString("yyyy-MM-dd")
+            
+            print(f"周期: {start_date} 到 {end_date}")
+            
+            # 获取每周运动总结
+            try:
+                weekly_exercise = self.db_manager.get_weekly_exercise_summary(
+                    self.user_id, start_date, end_date)
+                print(f"获取到每周运动总结: {weekly_exercise}")
+                
+                # 防止空值错误
+                if weekly_exercise is None:
+                    print("警告: 运动总结为None，使用空列表")
+                    weekly_exercise = []
+                
+                # 更新所有视图的总结
+                if hasattr(self, 'all_view') and self.all_view:
+                    summary_text = self.generate_summary_text(weekly_exercise)
+                    self.all_view.update_summary(summary_text)
+            except Exception as e:
+                print(f"更新运动总结时出错: {str(e)}")
+                # 提供默认值避免后续错误
+                weekly_exercise = []
+                if hasattr(self, 'all_view') and self.all_view:
+                    self.all_view.update_summary("本周暂无运动数据")
+        except Exception as e:
+            print(f"更新每周总结出错: {str(e)}")
+            # 避免错误传播
+    
+    def generate_summary_text(self, weekly_exercise):
+        """生成摘要文本"""
+        try:
+            if not weekly_exercise or len(weekly_exercise) == 0:
+                return "本周暂无运动记录"
+            
+            # 安全地尝试生成总结
+            total_days = len(set([ex[0] for ex in weekly_exercise if ex and len(ex) > 0]))
+            total_duration = sum([ex[1] for ex in weekly_exercise if ex and len(ex) > 1])
+            total_calories = sum([ex[2] for ex in weekly_exercise if ex and len(ex) > 2])
+            
+            return f"本周运动: {total_days}天, 总时长: {total_duration}分钟, 消耗: {total_calories}卡路里"
+        except Exception as e:
+            print(f"生成总结文本时出错: {str(e)}")
+            return "无法生成运动总结" 

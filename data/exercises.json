@@ -1,0 +1,219 @@
+[
+  {
+    "name": "步行",
+    "category": "有氧运动",
+    "calories_per_hour": 180,
+    "met": 3.0,
+    "description": "正常步行速度"
+  },
+  {
+    "name": "快走",
+    "category": "有氧运动",
+    "calories_per_hour": 255,
+    "met": 4.3,
+    "description": "快速步行(6km/h)"
+  },
+  {
+    "name": "慢跑",
+    "category": "有氧运动",
+    "calories_per_hour": 450,
+    "met": 7.5,
+    "description": "慢速跑步(8km/h)"
+  },
+  {
+    "name": "跑步",
+    "category": "有氧运动",
+    "calories_per_hour": 600,
+    "met": 10.0,
+    "description": "中速跑步(10km/h)"
+  },
+  {
+    "name": "快跑",
+    "category": "有氧运动",
+    "calories_per_hour": 750,
+    "met": 12.5,
+    "description": "快速跑步(12km/h)"
+  },
+  {
+    "name": "游泳",
+    "category": "有氧运动",
+    "calories_per_hour": 510,
+    "met": 8.5,
+    "description": "中等强度游泳"
+  },
+  {
+    "name": "自行车",
+    "category": "有氧运动",
+    "calories_per_hour": 420,
+    "met": 7.0,
+    "description": "中等强度骑行"
+  },
+  {
+    "name": "爬楼梯",
+    "category": "有氧运动",
+    "calories_per_hour": 450,
+    "met": 7.5,
+    "description": "上楼梯"
+  },
+  {
+    "name": "跳绳",
+    "category": "有氧运动",
+    "calories_per_hour": 600,
+    "met": 10.0,
+    "description": "中等速度跳绳"
+  },
+  {
+    "name": "健身操",
+    "category": "有氧运动",
+    "calories_per_hour": 480,
+    "met": 8.0,
+    "description": "有氧健身操"
+  },
+  {
+    "name": "瑜伽",
+    "category": "柔韧性锻炼",
+    "calories_per_hour": 210,
+    "met": 3.5,
+    "description": "普通瑜伽"
+  },
+  {
+    "name": "普拉提",
+    "category": "柔韧性锻炼",
+    "calories_per_hour": 240,
+    "met": 4.0,
+    "description": "普拉提练习"
+  },
+  {
+    "name": "太极",
+    "category": "柔韧性锻炼",
+    "calories_per_hour": 180,
+    "met": 3.0,
+    "description": "太极拳"
+  },
+  {
+    "name": "健身舞",
+    "category": "有氧运动",
+    "calories_per_hour": 390,
+    "met": 6.5,
+    "description": "快节奏舞蹈"
+  },
+  {
+    "name": "动感单车",
+    "category": "有氧运动",
+    "calories_per_hour": 540,
+    "met": 9.0,
+    "description": "高强度动感单车"
+  },
+  {
+    "name": "俯卧撑",
+    "category": "力量训练",
+    "calories_per_hour": 360,
+    "met": 6.0,
+    "description": "标准俯卧撑"
+  },
+  {
+    "name": "仰卧起坐",
+    "category": "力量训练",
+    "calories_per_hour": 300,
+    "met": 5.0,
+    "description": "标准仰卧起坐"
+  },
+  {
+    "name": "平板支撑",
+    "category": "力量训练",
+    "calories_per_hour": 240,
+    "met": 4.0,
+    "description": "标准平板支撑"
+  },
+  {
+    "name": "深蹲",
+    "category": "力量训练",
+    "calories_per_hour": 300,
+    "met": 5.0,
+    "description": "徒手深蹲"
+  },
+  {
+    "name": "哑铃训练",
+    "category": "力量训练",
+    "calories_per_hour": 360,
+    "met": 6.0,
+    "description": "中等强度哑铃训练"
+  },
+  {
+    "name": "杠铃训练",
+    "category": "力量训练",
+    "calories_per_hour": 420,
+    "met": 7.0,
+    "description": "中等强度杠铃训练"
+  },
+  {
+    "name": "篮球",
+    "category": "球类运动",
+    "calories_per_hour": 480,
+    "met": 8.0,
+    "description": "中等强度篮球"
+  },
+  {
+    "name": "足球",
+    "category": "球类运动",
+    "calories_per_hour": 510,
+    "met": 8.5,
+    "description": "中等强度足球"
+  },
+  {
+    "name": "羽毛球",
+    "category": "球类运动",
+    "calories_per_hour": 390,
+    "met": 6.5,
+    "description": "中等强度羽毛球"
+  },
+  {
+    "name": "乒乓球",
+    "category": "球类运动",
+    "calories_per_hour": 330,
+    "met": 5.5,
+    "description": "中等强度乒乓球"
+  },
+  {
+    "name": "网球",
+    "category": "球类运动",
+    "calories_per_hour": 450,
+    "met": 7.5,
+    "description": "中等强度网球"
+  },
+  {
+    "name": "排球",
+    "category": "球类运动",
+    "calories_per_hour": 360,
+    "met": 6.0,
+    "description": "中等强度排球"
+  },
+  {
+    "name": "拳击",
+    "category": "格斗运动",
+    "calories_per_hour": 540,
+    "met": 9.0,
+    "description": "中等强度拳击训练"
+  },
+  {
+    "name": "空手道",
+    "category": "格斗运动",
+    "calories_per_hour": 480,
+    "met": 8.0,
+    "description": "空手道训练"
+  },
+  {
+    "name": "划船",
+    "category": "有氧运动",
+    "calories_per_hour": 420,
+    "met": 7.0,
+    "description": "中等强度划船"
+  },
+  {
+    "name": "椭圆机",
+    "category": "有氧运动",
+    "calories_per_hour": 450,
+    "met": 7.5,
+    "description": "中等强度椭圆机"
+  }
+] 
