@@ -1,9 +1,107 @@
 from PyQt5.QtWidgets import (QMainWindow, QCalendarWidget, QVBoxLayout, QHBoxLayout, 
                             QWidget, QPushButton, QLabel, QComboBox, QStackedWidget,
-                            QAction, QToolBar, QMessageBox, QFrame, QTabWidget)
+                            QAction, QToolBar, QMessageBox, QFrame, QTabWidget, QInputDialog)
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
 from ui.diet_view import DietView
+
+# 导入其他需要的视图类
+# 为缺少的视图创建基本视图类
+class BaseView(QWidget):
+    """基本视图类，用于统一视图接口"""
+    
+    def __init__(self, user_id, db_manager, parent=None):
+        super().__init__(parent)
+        self.user_id = user_id
+        self.db_manager = db_manager
+        self.init_ui()
+    
+    def init_ui(self):
+        """初始化用户界面"""
+        layout = QVBoxLayout()
+        
+        # 默认标题
+        self.title_label = QLabel("数据视图")
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setFont(QFont("Arial", 16, QFont.Bold))
+        layout.addWidget(self.title_label)
+        
+        # 默认内容标签
+        self.content_label = QLabel("暂无数据")
+        self.content_label.setAlignment(Qt.AlignCenter)
+        self.content_label.setObjectName("contentView")
+        layout.addWidget(self.content_label)
+        
+        # 使用 stretch 填充
+        layout.addStretch()
+        
+        self.setLayout(layout)
+    
+    def update_date(self, selected_date):
+        """更新日期"""
+        self.selected_date = selected_date
+        self.content_label.setText(f"日期: {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+    
+    def load_data(self):
+        """加载数据，子类应重写此方法"""
+        pass
+
+
+class AllView(BaseView):
+    """所有内容综合视图"""
+    
+    def init_ui(self):
+        """初始化用户界面"""
+        super().init_ui()
+        self.title_label.setText("全部内容")
+    
+    def update_date(self, selected_date):
+        """更新日期"""
+        super().update_date(selected_date)
+        self.content_label.setText(f"全部内容 - {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+
+
+class ExerciseView(BaseView):
+    """运动记录视图"""
+    
+    def init_ui(self):
+        """初始化用户界面"""
+        super().init_ui()
+        self.title_label.setText("运动记录")
+    
+    def update_date(self, selected_date):
+        """更新日期"""
+        super().update_date(selected_date)
+        self.content_label.setText(f"运动记录 - {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+
+
+class SleepView(BaseView):
+    """睡眠记录视图"""
+    
+    def init_ui(self):
+        """初始化用户界面"""
+        super().init_ui()
+        self.title_label.setText("睡眠记录")
+    
+    def update_date(self, selected_date):
+        """更新日期"""
+        super().update_date(selected_date)
+        self.content_label.setText(f"睡眠记录 - {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+
+
+class PlanView(BaseView):
+    """计划安排视图"""
+    
+    def init_ui(self):
+        """初始化用户界面"""
+        super().init_ui()
+        self.title_label.setText("计划安排")
+    
+    def update_date(self, selected_date):
+        """更新日期"""
+        super().update_date(selected_date)
+        self.content_label.setText(f"计划安排 - {selected_date.toString('yyyy-MM-dd')}\n暂无数据")
+
 
 class MainWindow(QMainWindow):
     def __init__(self, user_id, username, db_manager):
@@ -105,37 +203,20 @@ class MainWindow(QMainWindow):
         self.content_stack = QStackedWidget()
         self.content_stack.setObjectName("contentStack")
         
-        # 在选项卡布局中添加饮食记录视图
-        self.tab_widget = QTabWidget()
-        
-        # 饮食记录标签页
+        # 创建各种视图
+        self.all_view = AllView(self.user_id, self.db_manager)
         self.diet_view = DietView(self.user_id, self.db_manager)
-        self.tab_widget.addTab(self.diet_view, "饮食记录")
+        self.exercise_view = ExerciseView(self.user_id, self.db_manager)
+        self.sleep_view = SleepView(self.user_id, self.db_manager)
+        self.plan_view = PlanView(self.user_id, self.db_manager)
         
-        # 创建不同的内容视图
-        self.all_view = QLabel("全部内容视图")
-        self.all_view.setAlignment(Qt.AlignCenter)
-        self.all_view.setObjectName("contentView")
-        
-        self.exercise_view = QLabel("运动内容视图")
-        self.exercise_view.setAlignment(Qt.AlignCenter)
-        self.exercise_view.setObjectName("contentView")
-        
-        self.sleep_view = QLabel("睡眠内容视图")
-        self.sleep_view.setAlignment(Qt.AlignCenter)
-        self.sleep_view.setObjectName("contentView")
-        
-        self.plan_view = QLabel("计划内容视图")
-        self.plan_view.setAlignment(Qt.AlignCenter)
-        self.plan_view.setObjectName("contentView")
-        
+        # 添加视图到堆叠部件
         self.content_stack.addWidget(self.all_view)
         self.content_stack.addWidget(self.diet_view)
         self.content_stack.addWidget(self.exercise_view)
         self.content_stack.addWidget(self.sleep_view)
         self.content_stack.addWidget(self.plan_view)
         
-        right_layout.addWidget(self.tab_widget)
         right_layout.addWidget(self.content_stack)
         
         # 将左右区域添加到主布局
@@ -206,21 +287,79 @@ class MainWindow(QMainWindow):
         """显示模式改变事件"""
         self.content_stack.setCurrentIndex(index)
         
+        # 确保当前视图的日期是最新的
+        self.update_current_view()
+        
+    def update_current_view(self):
+        """更新当前显示的视图"""
+        current_index = self.content_stack.currentIndex()
+        current_view = self.content_stack.widget(current_index)
+        
+        # 如果是DietView，特殊处理
+        if isinstance(current_view, DietView):
+            if hasattr(current_view, 'date_edit'):
+                current_view.date_edit.setDate(self.calendar.selectedDate())
+                current_view.load_diet_records()
+        # 其他视图使用标准的update_date方法
+        elif hasattr(current_view, 'update_date'):
+            current_view.update_date(self.calendar.selectedDate())
+            
     def load_date_data(self):
         """加载所选日期的数据"""
-        # 这里需要实现从数据库加载当天的数据
-        # 暂时使用占位文本
-        selected_date = self.calendar.selectedDate().toString('yyyy-MM-dd')
+        selected_date = self.calendar.selectedDate()
         
-        self.all_view.setText(f"全部内容 - {selected_date}\n暂无数据")
-        self.diet_view.setText(f"饮食记录 - {selected_date}\n暂无数据")
-        self.exercise_view.setText(f"运动记录 - {selected_date}\n暂无数据")
-        self.sleep_view.setText(f"睡眠记录 - {selected_date}\n暂无数据")
-        self.plan_view.setText(f"计划安排 - {selected_date}\n暂无数据")
+        # 更新所有视图的日期
+        self.all_view.update_date(selected_date)
+        
+        # DietView 需要特殊处理，因为它有自己的日期控件
+        if hasattr(self.diet_view, 'date_edit'):
+            self.diet_view.date_edit.setDate(selected_date)
+            self.diet_view.load_diet_records()
+        
+        # 更新其他视图
+        self.exercise_view.update_date(selected_date)
+        self.sleep_view.update_date(selected_date)
+        self.plan_view.update_date(selected_date)
         
     def add_record(self):
         """添加记录"""
-        QMessageBox.information(self, "提示", "添加记录功能正在开发中...")
+        current_index = self.mode_combo.currentIndex()
+        
+        if current_index == 0:  # 全部模式
+            # 弹出选择对话框让用户选择要添加的记录类型
+            record_types = ["饮食记录", "运动记录", "睡眠记录"]
+            selected_type, ok = QInputDialog.getItem(
+                self, "选择记录类型", "请选择要添加的记录类型:", 
+                record_types, 0, False
+            )
+            if not ok:
+                return
+                
+            if selected_type == "饮食记录":
+                self.add_diet_record()
+            elif selected_type == "运动记录":
+                QMessageBox.information(self, "提示", "添加运动记录功能正在开发中...")
+            elif selected_type == "睡眠记录":
+                QMessageBox.information(self, "提示", "添加睡眠记录功能正在开发中...")
+        
+        elif current_index == 1:  # 饮食模式
+            self.add_diet_record()
+        elif current_index == 2:  # 运动模式
+            QMessageBox.information(self, "提示", "添加运动记录功能正在开发中...")
+        elif current_index == 3:  # 睡眠模式
+            QMessageBox.information(self, "提示", "添加睡眠记录功能正在开发中...")
+        elif current_index == 4:  # 计划模式
+            self.add_plan()
+    
+    def add_diet_record(self):
+        """添加饮食记录"""
+        if hasattr(self.diet_view, 'add_diet_record'):
+            self.diet_view.add_diet_record()
+        else:
+            from ui.diet_record import DietRecordDialog
+            dialog = DietRecordDialog(self.user_id, self.db_manager)
+            dialog.record_added.connect(lambda: self.diet_view.load_diet_records())
+            dialog.exec_()
         
     def add_plan(self):
         """添加提醒计划"""

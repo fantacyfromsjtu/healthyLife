@@ -98,7 +98,9 @@ class ReminderManager(QObject):
         import sqlite3
         try:
             # 创建临时数据库连接
-            temp_conn = sqlite3.connect(self.db_manager.db_path)
+            temp_conn = sqlite3.connect(self.db_manager.db_path, timeout=30.0)
+            # 启用WAL模式
+            temp_conn.execute("PRAGMA journal_mode=WAL")
             temp_conn.row_factory = sqlite3.Row  # 让结果以字典形式返回
             temp_cursor = temp_conn.cursor()
             

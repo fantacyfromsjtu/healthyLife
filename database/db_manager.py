@@ -2,6 +2,47 @@ import sqlite3
 import os
 import time
 import json
+import functools
+import logging
+
+# 数据库操作重试装饰器
+def db_retry(max_attempts=3, delay=0.5):
+    """
+    数据库操作重试装饰器，处理锁定和超时情况
+    
+    参数:
+        max_attempts: 最大尝试次数
+        delay: 重试前的延迟(秒)，每次重试后加倍
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            attempt = 0
+            current_delay = delay
+            last_error = None
+            
+            while attempt < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except sqlite3.OperationalError as e:
+                    # 只有当错误是数据库锁定时才重试
+                    if "database is locked" in str(e) or "timeout" in str(e):
+                        attempt += 1
+                        last_error = e
+                        if attempt < max_attempts:
+                            logging.warning(f"数据库锁定，{current_delay}秒后重试(尝试 {attempt}/{max_attempts})")
+                            time.sleep(current_delay)
+                            current_delay *= 2  # 指数级延迟
+                        continue
+                    raise  # 其他操作错误直接抛出
+                except Exception as e:
+                    # 非数据库锁定错误直接抛出
+                    raise
+            
+            # 如果达到最大尝试次数仍失败
+            raise last_error
+        return wrapper
+    return decorator
 
 class DatabaseManager:
     def __init__(self, db_path="healthylife.db"):
@@ -17,13 +58,37 @@ class DatabaseManager:
         
     def connect(self):
         """创建数据库连接"""
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = sqlite3.connect(self.db_path, timeout=30.0)  # 增加超时时间
+        # 启用WAL模式，提高并发性能
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        # 启用外键约束
+        self.conn.execute("PRAGMA foreign_keys=ON")
         self.cursor = self.conn.cursor()
         
     def close(self):
         """关闭数据库连接"""
         if self.conn:
-            self.conn.close()
+            try:
+                # 确保提交所有未决事务
+                self.conn.commit()
+            except sqlite3.Error:
+                # 如果提交失败，尝试回滚
+                try:
+                    self.conn.rollback()
+                except:
+                    pass
+            finally:
+                self.conn.close()
+                self.conn = None
+                self.cursor = None
+                
+    def __enter__(self):
+        """上下文管理器支持"""
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """退出上下文时关闭连接"""
+        self.close()
             
     def create_tables(self):
         """创建所需的数据表"""
@@ -123,6 +188,7 @@ class DatabaseManager:
         
         self.conn.commit()
         
+    @db_retry()
     def add_user(self, username, password):
         """添加新用户"""
         try:
@@ -167,6 +233,7 @@ class DatabaseManager:
             print(f"获取用户资料错误: {e}")
             return None
 
+    @db_retry()
     def update_user_profile(self, user_id, gender, age, height, weight, diet_habit, exercise_habit, sleep_habit):
         """更新用户个人资料"""
         try:
@@ -241,6 +308,7 @@ class DatabaseManager:
             print(f"搜索食物错误: {e}")
             return []
 
+    @db_retry()
     def add_diet_record(self, user_id, food_id, food_name, amount, unit, meal_type, record_date, record_time, notes=""):
         """添加饮食记录"""
         try:
@@ -293,6 +361,7 @@ class DatabaseManager:
             print(f"获取饮食记录错误: {e}")
             return []
 
+    @db_retry()
     def update_diet_record(self, record_id, amount, unit, meal_type, record_date, record_time, notes):
         """更新饮食记录"""
         try:
