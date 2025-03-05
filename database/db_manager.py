@@ -357,4 +357,203 @@ class DatabaseManager:
             except Exception as e:
                 print(f"导入食物数据时出错: {e}")
         else:
-            print("未找到食物数据文件，路径:", json_path) 
+            print("未找到食物数据文件，路径:", json_path)
+
+    def add_reminder(self, user_id, date, time, reminder_type, content):
+        """
+        添加新的提醒
+        
+        参数:
+            user_id (int): 用户ID
+            date (str): 日期，格式为YYYY-MM-DD
+            time (str): 时间，格式为HH:MM
+            reminder_type (str): 提醒类型（锻炼/吃饭/睡觉）
+            content (str): 提醒内容
+            
+        返回:
+            int: 新增提醒的ID
+        """
+        try:
+            self.cursor.execute('''
+            INSERT INTO reminders (user_id, date, time, reminder_type, content, is_completed)
+            VALUES (?, ?, ?, ?, ?, 0)
+            ''', (user_id, date, time, reminder_type, content))
+            
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except Exception as e:
+            print(f"添加提醒失败: {e}")
+            return None
+
+    def get_reminders_by_user_date(self, user_id, date=None):
+        """
+        获取用户特定日期的所有提醒
+        
+        参数:
+            user_id (int): 用户ID
+            date (str, optional): 日期，格式为YYYY-MM-DD。如果为None，则获取所有日期的提醒
+            
+        返回:
+            list: 提醒记录列表
+        """
+        try:
+            if date:
+                self.cursor.execute('''
+                SELECT id, user_id, date, time, reminder_type, content, is_completed
+                FROM reminders
+                WHERE user_id = ? AND date = ?
+                ORDER BY time
+                ''', (user_id, date))
+            else:
+                self.cursor.execute('''
+                SELECT id, user_id, date, time, reminder_type, content, is_completed
+                FROM reminders
+                WHERE user_id = ?
+                ORDER BY date, time
+                ''', (user_id,))
+                
+            reminders = []
+            for row in self.cursor.fetchall():
+                reminder = {
+                    'id': row[0],
+                    'user_id': row[1],
+                    'date': row[2],
+                    'time': row[3],
+                    'reminder_type': row[4],
+                    'content': row[5],
+                    'is_completed': row[6]
+                }
+                reminders.append(reminder)
+            return reminders
+        except Exception as e:
+            print(f"获取提醒失败: {e}")
+            return []
+
+    def get_reminders_for_time_range(self, user_id, start_time, end_time):
+        """
+        获取指定时间范围内的提醒
+        
+        参数:
+            user_id (int): 用户ID
+            start_time (datetime): 开始时间
+            end_time (datetime): 结束时间
+            
+        返回:
+            list: 提醒记录列表
+        """
+        start_date = start_time.strftime("%Y-%m-%d")
+        end_date = end_time.strftime("%Y-%m-%d")
+        start_time_str = start_time.strftime("%H:%M")
+        end_time_str = end_time.strftime("%H:%M")
+        
+        try:
+            # 处理同一天的情况
+            if start_date == end_date:
+                self.cursor.execute('''
+                SELECT id, user_id, date, time, reminder_type, content, is_completed
+                FROM reminders
+                WHERE user_id = ? AND date = ? AND time BETWEEN ? AND ?
+                AND is_completed = 0
+                ORDER BY time
+                ''', (user_id, start_date, start_time_str, end_time_str))
+            else:
+                # 处理跨天的情况
+                self.cursor.execute('''
+                SELECT id, user_id, date, time, reminder_type, content, is_completed
+                FROM reminders
+                WHERE user_id = ? AND 
+                      ((date = ? AND time >= ?) OR (date = ? AND time <= ?))
+                AND is_completed = 0
+                ORDER BY date, time
+                ''', (user_id, start_date, start_time_str, end_date, end_time_str))
+                
+            reminders = []
+            for row in self.cursor.fetchall():
+                reminder = {
+                    'id': row[0],
+                    'user_id': row[1],
+                    'date': row[2],
+                    'time': row[3],
+                    'reminder_type': row[4],
+                    'content': row[5],
+                    'is_completed': row[6]
+                }
+                reminders.append(reminder)
+            return reminders
+        except Exception as e:
+            print(f"获取时间范围内的提醒失败: {e}")
+            return []
+
+    def update_reminder(self, reminder_id, date=None, time=None, content=None, is_completed=None):
+        """
+        更新提醒信息
+        
+        参数:
+            reminder_id (int): 提醒ID
+            date (str, optional): 新的日期
+            time (str, optional): 新的时间
+            content (str, optional): 新的内容
+            is_completed (int, optional): 是否已完成
+            
+        返回:
+            bool: 更新是否成功
+        """
+        try:
+            update_fields = []
+            values = []
+            
+            if date is not None:
+                update_fields.append("date = ?")
+                values.append(date)
+            if time is not None:
+                update_fields.append("time = ?")
+                values.append(time)
+            if content is not None:
+                update_fields.append("content = ?")
+                values.append(content)
+            if is_completed is not None:
+                update_fields.append("is_completed = ?")
+                values.append(is_completed)
+                
+            if not update_fields:
+                return False
+                
+            query = f"UPDATE reminders SET {', '.join(update_fields)} WHERE id = ?"
+            values.append(reminder_id)
+            
+            self.cursor.execute(query, tuple(values))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"更新提醒失败: {e}")
+            return False
+
+    def delete_reminder(self, reminder_id):
+        """
+        删除提醒
+        
+        参数:
+            reminder_id (int): 提醒ID
+            
+        返回:
+            bool: 删除是否成功
+        """
+        try:
+            self.cursor.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"删除提醒失败: {e}")
+            return False
+
+    def mark_reminder_completed(self, reminder_id):
+        """
+        将提醒标记为已完成
+        
+        参数:
+            reminder_id (int): 提醒ID
+            
+        返回:
+            bool: 操作是否成功
+        """
+        return self.update_reminder(reminder_id, is_completed=1) 

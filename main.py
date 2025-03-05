@@ -27,8 +27,17 @@ def main():
     # 初始化食物数据库
     db_manager.initialize_food_database()
     
+    # 初始化并启动提醒服务
+    from utils.reminder import get_reminder_manager
+    reminder_manager = get_reminder_manager(db_manager)
+    reminder_manager.start()
+    
     login_window = LoginWindow()
     login_window.show()
+    
+    # 应用关闭前停止提醒服务
+    app.aboutToQuit.connect(reminder_manager.stop)
+    
     sys.exit(app.exec_())
 
 if __name__ == "__main__":

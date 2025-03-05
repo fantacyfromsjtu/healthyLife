@@ -297,7 +297,7 @@ class LoginWindow(QWidget):
         
         # 创建数据库连接
         db_manager = DatabaseManager()
-        user_id = db_manager.validate_user(username, password)
+        user_id = db_manager.verify_user(username, password)
         
         if user_id:
             QMessageBox.information(self, "成功", f"欢迎回来，{username}！")

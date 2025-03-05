@@ -176,6 +176,13 @@ class MainWindow(QMainWindow):
         weekly_report_action.triggered.connect(self.show_weekly_report)
         report_menu.addAction(weekly_report_action)
         
+        # 添加"查看提醒"菜单项
+        tools_menu = self.menuBar().addMenu("工具")
+        
+        view_reminders_action = QAction("查看提醒", self)
+        view_reminders_action.triggered.connect(self.view_reminders)
+        tools_menu.addAction(view_reminders_action)
+        
         # 工具栏
         toolbar = QToolBar("主工具栏")
         self.addToolBar(toolbar)
@@ -216,8 +223,11 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "提示", "添加记录功能正在开发中...")
         
     def add_plan(self):
-        """添加计划"""
-        QMessageBox.information(self, "提示", "添加计划功能正在开发中...")
+        """添加提醒计划"""
+        from ui.reminder import ReminderDialog
+        dialog = ReminderDialog(self.db_manager, self.user_id, self)
+        dialog.reminder_updated.connect(self.load_date_data)
+        dialog.exec_()
         
     def export_report(self):
         """导出报告"""
@@ -242,4 +252,10 @@ class MainWindow(QMainWindow):
         
     def show_weekly_report(self):
         """显示每周报告"""
-        QMessageBox.information(self, "提示", "每周报告功能正在开发中...") 
+        QMessageBox.information(self, "提示", "每周报告功能正在开发中...")
+        
+    def view_reminders(self):
+        """查看所有提醒"""
+        from ui.reminder import ReminderView
+        self.reminder_view = ReminderView(self.user_id, self.db_manager, self)
+        self.reminder_view.show() 
