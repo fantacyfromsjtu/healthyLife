@@ -9,198 +9,110 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                            QComboBox, QDateEdit, QTimeEdit, QLineEdit, QTableWidget,
                            QTableWidgetItem, QMessageBox, QHeaderView, QGridLayout,
-                           QDialog, QFrame)
-from PyQt5.QtCore import Qt, QDate, QTime, pyqtSignal
+                           QDialog, QFrame, QTextEdit, QGroupBox, QFormLayout)
+from PyQt5.QtCore import Qt, QDate, QTime, pyqtSignal, QDateTime
 from PyQt5.QtGui import QIcon, QFont
 
 import datetime
 
 class ReminderDialog(QDialog):
-    """提醒创建/编辑对话框"""
+    """创建或编辑提醒的对话框"""
     
-    # 定义信号，提醒添加或更新后发出
+    # 信号
     reminder_updated = pyqtSignal()
     
-    def __init__(self, db_manager, user_id, parent=None, reminder_id=None):
-        """
-        初始化提醒对话框
-        
-        参数:
-            db_manager: 数据库管理器
-            user_id (int): 用户ID
-            parent: 父窗口
-            reminder_id (int, optional): 提醒ID，如果提供则为编辑模式
-        """
+    def __init__(self, db_manager, user_id, parent=None):
         super().__init__(parent)
         self.db_manager = db_manager
         self.user_id = user_id
-        self.reminder_id = reminder_id
-        self.reminder_data = None
         
-        # 如果有提醒ID，则加载该提醒数据
-        if reminder_id:
-            self.load_reminder_data()
-            self.setWindowTitle("编辑提醒")
-        else:
-            self.setWindowTitle("添加提醒")
+        self.setWindowTitle("添加提醒")
+        self.resize(500, 400)
         
         self.init_ui()
         
-    def load_reminder_data(self):
-        """加载提醒数据"""
-        reminders = self.db_manager.get_reminders_by_user_date(self.user_id)
-        for r in reminders:
-            if r['id'] == self.reminder_id:
-                self.reminder_data = r
-                break
-    
     def init_ui(self):
         """初始化用户界面"""
-        self.setMinimumWidth(400)
+        main_layout = QVBoxLayout()
         
-        layout = QVBoxLayout()
+        # 提醒信息组
+        reminder_group = QGroupBox("提醒信息")
+        reminder_layout = QFormLayout()
+        reminder_group.setLayout(reminder_layout)
+        
+        # 日期选择
+        self.date_edit = QDateEdit(QDate.currentDate())
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDisplayFormat("yyyy-MM-dd")
+        reminder_layout.addRow(QLabel("日期:"), self.date_edit)
+        
+        # 时间选择
+        self.time_edit = QTimeEdit(QTime.currentTime().addSecs(3600))  # 默认一小时后
+        self.time_edit.setDisplayFormat("HH:mm")
+        reminder_layout.addRow(QLabel("时间:"), self.time_edit)
         
         # 提醒类型
-        type_layout = QHBoxLayout()
-        type_label = QLabel("提醒类型:")
-        self.type_combo = QComboBox()
-        self.type_combo.addItems(["锻炼", "吃饭", "睡觉"])
-        type_layout.addWidget(type_label)
-        type_layout.addWidget(self.type_combo)
-        layout.addLayout(type_layout)
+        self.reminder_type = QComboBox()
+        self.reminder_type.addItems(["饮食", "运动", "睡眠", "学习", "其他"])
+        reminder_layout.addRow(QLabel("类型:"), self.reminder_type)
         
-        # 日期
-        date_layout = QHBoxLayout()
-        date_label = QLabel("日期:")
-        self.date_edit = QDateEdit()
-        self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDate(QDate.currentDate())
-        date_layout.addWidget(date_label)
-        date_layout.addWidget(self.date_edit)
-        layout.addLayout(date_layout)
+        # 提醒内容
+        self.content_edit = QTextEdit()
+        self.content_edit.setPlaceholderText("请输入提醒内容...")
+        reminder_layout.addRow(QLabel("内容:"), self.content_edit)
         
-        # 时间
-        time_layout = QHBoxLayout()
-        time_label = QLabel("时间:")
-        self.time_edit = QTimeEdit()
-        self.time_edit.setTime(QTime.currentTime())
-        time_layout.addWidget(time_label)
-        time_layout.addWidget(self.time_edit)
-        layout.addLayout(time_layout)
+        main_layout.addWidget(reminder_group)
         
-        # 内容
-        content_layout = QHBoxLayout()
-        content_label = QLabel("提醒内容:")
-        self.content_edit = QLineEdit()
-        content_layout.addWidget(content_label)
-        content_layout.addWidget(self.content_edit)
-        layout.addLayout(content_layout)
+        # 按钮区域
+        button_layout = QHBoxLayout()
         
-        # 按钮
-        btn_layout = QHBoxLayout()
-        self.save_btn = QPushButton("保存")
-        self.save_btn.clicked.connect(self.save_reminder)
-        self.cancel_btn = QPushButton("取消")
-        self.cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(self.save_btn)
-        btn_layout.addWidget(self.cancel_btn)
-        layout.addLayout(btn_layout)
+        self.save_button = QPushButton("保存")
+        self.save_button.setObjectName("primaryButton")
+        self.save_button.clicked.connect(self.save_reminder)
         
-        self.setLayout(layout)
+        self.cancel_button = QPushButton("取消")
+        self.cancel_button.clicked.connect(self.reject)
         
-        # 如果是编辑模式，填充已有数据
-        if self.reminder_data:
-            self.fill_form_with_data()
-    
-    def fill_form_with_data(self):
-        """用已有数据填充表单"""
-        if not self.reminder_data:
-            return
-            
-        # 设置提醒类型
-        reminder_type = self.reminder_data['reminder_type']
-        index = self.type_combo.findText(reminder_type)
-        if index >= 0:
-            self.type_combo.setCurrentIndex(index)
+        button_layout.addStretch()
+        button_layout.addWidget(self.save_button)
+        button_layout.addWidget(self.cancel_button)
         
-        # 设置日期
-        try:
-            date = QDate.fromString(self.reminder_data['date'], "yyyy-MM-dd")
-            self.date_edit.setDate(date)
-        except:
-            pass
+        main_layout.addLayout(button_layout)
+        self.setLayout(main_layout)
         
-        # 设置时间
-        try:
-            time = QTime.fromString(self.reminder_data['time'], "HH:mm")
-            self.time_edit.setTime(time)
-        except:
-            pass
-        
-        # 设置内容
-        self.content_edit.setText(self.reminder_data['content'] or "")
-    
     def save_reminder(self):
-        """保存提醒数据"""
-        reminder_type = self.type_combo.currentText()
-        date = self.date_edit.date().toString("yyyy-MM-dd")
-        time = self.time_edit.time().toString("HH:mm")
-        content = self.content_edit.text()
-        
-        # 简单验证
-        if not content:
-            QMessageBox.warning(self, "提示", "请输入提醒内容")
-            return
-        
-        # 检查日期是否已过
-        current_date = datetime.datetime.now().date()
-        selected_date = self.date_edit.date().toPyDate()
-        current_time = datetime.datetime.now().time()
-        selected_time = self.time_edit.time().toPyTime()
-        
-        if selected_date < current_date or (selected_date == current_date and selected_time < current_time):
-            response = QMessageBox.question(
-                self, 
-                "确认", 
-                "您选择的时间已经过去，确定要继续吗？",
-                QMessageBox.Yes | QMessageBox.No, 
-                QMessageBox.No
-            )
-            if response == QMessageBox.No:
-                return
-        
+        """保存提醒"""
         try:
-            # 如果是编辑模式
-            if self.reminder_id:
-                success = self.db_manager.update_reminder(
-                    self.reminder_id, 
-                    date=date, 
-                    time=time, 
-                    content=content
-                )
-                if success:
-                    QMessageBox.information(self, "成功", "提醒已更新")
-                    self.reminder_updated.emit()
-                    self.accept()
-                else:
-                    QMessageBox.critical(self, "错误", "更新提醒失败")
+            # 获取用户输入
+            date = self.date_edit.date().toString("yyyy-MM-dd")
+            time = self.time_edit.time().toString("HH:mm")  # 不需要秒
+            reminder_type = self.reminder_type.currentText()
+            content = self.content_edit.toPlainText()
+            
+            # 基本验证
+            if not content.strip():
+                QMessageBox.warning(self, "警告", "请输入提醒内容")
+                return
+            
+            # 将数据保存到数据库
+            print(f"保存提醒: 日期={date}, 时间={time}, 类型={reminder_type}, 内容={content}")
+            reminder_id = self.db_manager.add_reminder(self.user_id, date, time, reminder_type, content)
+            
+            if reminder_id:
+                print(f"提醒已保存，ID={reminder_id}")
+                QMessageBox.information(self, "成功", "提醒已成功添加！")
+                self.reminder_updated.emit()  # 发出信号
+                self.accept()
             else:
-                # 添加新提醒
-                reminder_id = self.db_manager.add_reminder(
-                    self.user_id, 
-                    date, 
-                    time, 
-                    reminder_type, 
-                    content
-                )
-                if reminder_id:
-                    QMessageBox.information(self, "成功", "提醒已添加")
-                    self.reminder_updated.emit()
-                    self.accept()
-                else:
-                    QMessageBox.critical(self, "错误", "添加提醒失败")
+                QMessageBox.warning(self, "错误", "保存提醒失败，请重试")
+                
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"保存提醒时发生错误: {str(e)}")
+            print(f"保存提醒时出错: {str(e)}")
+            QMessageBox.critical(self, "错误", f"发生错误: {str(e)}")
+            
+    def closeEvent(self, event):
+        """处理关闭事件"""
+        super().closeEvent(event)
 
 
 class ReminderView(QWidget):
@@ -325,7 +237,7 @@ class ReminderView(QWidget):
         row = selected_rows[0].row()
         reminder_id = int(self.reminder_table.item(row, 0).text())
         
-        dialog = ReminderDialog(self.db_manager, self.user_id, self, reminder_id)
+        dialog = ReminderDialog(self.db_manager, self.user_id, self)
         dialog.reminder_updated.connect(self.load_reminders)
         dialog.exec_()
     

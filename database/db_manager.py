@@ -702,53 +702,51 @@ class DatabaseManager:
             return []
 
     def get_reminders_for_time_range(self, user_id, start_time, end_time):
-        """获取指定时间范围内的提醒
+        """
+        获取特定时间范围内的提醒
         
         参数:
-            user_id (int): 用户ID
-            start_time (str): 开始时间，格式为 "YYYY-MM-DD HH:MM"
-            end_time (str): 结束时间，格式为 "YYYY-MM-DD HH:MM"
+            user_id: 用户ID
+            start_time: 起始时间 (date_str, time_str)
+            end_time: 结束时间 (date_str, time_str)
             
         返回:
-            list: 提醒列表
+            提醒列表
         """
         try:
-            # 解析时间
-            start_date, start_hour = start_time.split(" ")
-            end_date, end_hour = end_time.split(" ")
+            start_date, start_time_str = start_time
+            end_date, end_time_str = end_time
             
-            # 边界条件：在完全不同的日期
-            if start_date != end_date:
-                self.cursor.execute(
-                    """
-                    SELECT id, user_id, reminder_date, reminder_time, reminder_type, content, is_completed
-                    FROM reminders 
-                    WHERE user_id = ? AND 
-                    (
-                        (reminder_date = ? AND reminder_time >= ?) OR
-                        (reminder_date > ? AND reminder_date < ?) OR
-                        (reminder_date = ? AND reminder_time <= ?)
-                    )
-                    AND is_completed = 0
-                    ORDER BY reminder_date, reminder_time
-                    """,
-                    (user_id, start_date, start_hour, start_date, end_date, end_date, end_hour)
-                )
+            print(f"查询时间范围内的提醒: {start_date} {start_time_str} - {end_date} {end_time_str}")
+            
+            cursor = self.conn.cursor()
+            
+            # 构建查询
+            # 简化查询以确保能够捕获到今天所有时间范围内的提醒
+            cursor.execute(
+                """
+                SELECT * FROM reminders 
+                WHERE user_id = ? 
+                AND reminder_date = ? 
+                AND reminder_time BETWEEN ? AND ?
+                AND is_completed = 0
+                ORDER BY reminder_time
+                """,
+                (user_id, start_date, start_time_str, end_time_str)
+            )
+            
+            reminders = cursor.fetchall()
+            
+            if reminders:
+                print(f"找到{len(reminders)}条时间范围内的提醒")
+                if len(reminders) > 0:
+                    for i, reminder in enumerate(reminders):
+                        print(f"  提醒 {i+1}: ID={reminder[0]}, 日期={reminder[2]}, 时间={reminder[3]}, 内容={reminder[5]}")
             else:
-                # 同一天内的时间范围
-                self.cursor.execute(
-                    """
-                    SELECT id, user_id, reminder_date, reminder_time, reminder_type, content, is_completed
-                    FROM reminders 
-                    WHERE user_id = ? AND reminder_date = ? AND reminder_time >= ? AND reminder_time <= ?
-                    AND is_completed = 0
-                    ORDER BY reminder_time
-                    """,
-                    (user_id, start_date, start_hour, end_hour)
-                )
-            
-            return self.cursor.fetchall()
-        except Exception as e:
+                print("未找到时间范围内的提醒")
+                
+            return reminders
+        except sqlite3.Error as e:
             print(f"获取时间范围内的提醒失败: {str(e)}")
             return []
 
@@ -822,16 +820,43 @@ class DatabaseManager:
             return False
 
     def mark_reminder_completed(self, reminder_id):
-        """
-        将提醒标记为已完成
+        """将提醒标记为已完成
         
         参数:
-            reminder_id (int): 提醒ID
+            reminder_id: 提醒ID
             
         返回:
-            bool: 操作是否成功
+            bool: 成功返回True，失败返回False
         """
-        return self.update_reminder(reminder_id, is_completed=1)
+        try:
+            print(f"标记提醒为已完成: ID={reminder_id}")
+            
+            # 确认提醒存在
+            self.cursor.execute("SELECT id FROM reminders WHERE id = ?", (reminder_id,))
+            if not self.cursor.fetchone():
+                print(f"提醒不存在: ID={reminder_id}")
+                return False
+            
+            # 更新完成状态
+            self.cursor.execute(
+                "UPDATE reminders SET is_completed = 1 WHERE id = ?",
+                (reminder_id,)
+            )
+            self.conn.commit()
+            
+            # 验证更新是否成功
+            self.cursor.execute("SELECT is_completed FROM reminders WHERE id = ?", (reminder_id,))
+            result = self.cursor.fetchone()
+            if result and result[0] == 1:
+                print(f"提醒已成功标记为完成: ID={reminder_id}")
+                return True
+            else:
+                print(f"标记提醒完成失败: ID={reminder_id}")
+                return False
+                
+        except sqlite3.Error as e:
+            print(f"标记提醒完成时出错: {str(e)}")
+            return False
 
     @db_retry()
     def add_exercise_record(self, user_id, exercise_name, category, duration, intensity, calories_burned, record_date, record_time, notes=""):

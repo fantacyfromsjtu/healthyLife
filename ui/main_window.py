@@ -191,11 +191,26 @@ class PlanView(BaseView):
 
 class MainWindow(QMainWindow):
     def __init__(self, user_id, username, db_manager):
+        """初始化主窗口"""
         super().__init__()
         self.user_id = user_id
         self.username = username
-        self.db_manager = db_manager  # 添加数据库管理器
+        self.db_manager = db_manager
+        print(f"正在创建主窗口实例...")
+        
+        # 初始化提醒管理器
+        from utils.reminder import ReminderManager, show_reminder
+        self.reminder_manager = ReminderManager(db_manager, user_id, self)
+        self.reminder_manager.reminder_triggered.connect(self.on_reminder_triggered)
+        print("提醒管理器已连接到主窗口")
+        
         self.init_ui()
+        
+        # 加载初始数据
+        self.load_date_data()
+        self.update_weekly_summary()
+        
+        print("主窗口实例化完成")
         
     def init_ui(self):
         """初始化用户界面"""
@@ -311,9 +326,6 @@ class MainWindow(QMainWindow):
         
         # 创建菜单和工具栏
         self.create_menus()
-        
-        # 初始化加载周报数据
-        self.update_weekly_summary()
         
     def create_menus(self):
         """创建菜单和工具栏"""
@@ -629,4 +641,32 @@ class MainWindow(QMainWindow):
             return f"本周运动: {total_days}天, 总时长: {total_duration}分钟, 消耗: {total_calories}卡路里"
         except Exception as e:
             print(f"生成总结文本时出错: {str(e)}")
-            return "无法生成运动总结" 
+            return "无法生成运动总结"
+
+    def on_reminder_triggered(self, title, content, reminder_id):
+        """处理提醒触发事件"""
+        try:
+            from utils.reminder import show_reminder
+            print(f"MainWindow接收到提醒触发事件: {title}")
+            
+            # 调用弹出提醒对话框的函数
+            result = show_reminder(self, self.db_manager, title, content, reminder_id)
+            print(f"提醒对话框结果: {result}")
+            
+            # 刷新计划视图，显示更新后的提醒状态
+            if hasattr(self, 'plan_view') and hasattr(self.plan_view, 'load_reminders'):
+                self.plan_view.load_reminders()
+                print("已刷新计划视图")
+            
+        except Exception as e:
+            print(f"处理提醒触发时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # 出错时尝试直接显示一个基本的消息框
+            try:
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.information(self, title, content)
+                print("使用基本消息框显示提醒")
+            except Exception as e2:
+                print(f"显示基本消息框也失败: {str(e2)}") 

@@ -153,7 +153,22 @@ class DietView(QWidget):
                     amount = record[4] if len(record) > 4 else 0
                     unit = record[5] if len(record) > 5 else "份"
                     meal_type = record[6] if len(record) > 6 else "未知"
-                    record_time_str = record[8].split()[1][:5] if len(record) > 8 and record[8] else "00:00"
+                    
+                    # 安全地获取时间字符串
+                    record_time_str = "00:00"
+                    if len(record) > 8 and record[8]:
+                        try:
+                            # 如果时间格式是 "HH:MM:SS"
+                            if ":" in record[8]:
+                                record_time_str = record[8].split(":")[0:2]
+                                record_time_str = ":".join(record_time_str)
+                            # 如果时间格式是 "YYYY-MM-DD HH:MM:SS"
+                            elif " " in record[8]:
+                                record_time_str = record[8].split()[1].split(":")[0:2]
+                                record_time_str = ":".join(record_time_str)
+                        except Exception as e:
+                            print(f"处理时间字符串出错: {str(e)}, 使用默认时间")
+                            record_time_str = "00:00"
                     
                     print(f"  基本信息: id={record_id}, 食物={food_name}, 数量={amount}{unit}, 类型={meal_type}, 时间={record_time_str}")
                     
