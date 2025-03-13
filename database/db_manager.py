@@ -223,6 +223,23 @@ class DatabaseManager:
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
             ''')
+            
+            # 创建睡眠记录表
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sleep_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sleep_date DATE,
+                sleep_time TIME,
+                wake_date DATE,
+                wake_time TIME,
+                duration INTEGER,  -- 以分钟为单位
+                quality INTEGER,   -- 0-5，0表示未评价，1-5表示从很差到优秀
+                notes TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            ''')
 
             self.conn.commit()
             print("数据库表创建/更新成功")
@@ -1029,49 +1046,170 @@ class DatabaseManager:
             return 0
 
     def get_weekly_exercise_summary(self, user_id, start_date, end_date):
-        """
-        获取用户在指定日期范围内的运动总结
-        
-        参数:
-        - user_id: 用户ID
-        - start_date: 开始日期 (YYYY-MM-DD)
-        - end_date: 结束日期 (YYYY-MM-DD)
-        
-        返回:
-        - 列表，每个元素包含 [日期, 总时长, 总消耗卡路里]
-        """
+        """获取每周运动摘要"""
         try:
-            cursor = self.conn.cursor()
+            self.cursor.execute("""
+            SELECT record_date, SUM(duration), SUM(calories_burned)
+            FROM exercise_records
+            WHERE user_id = ? AND record_date BETWEEN ? AND ?
+            GROUP BY record_date
+            ORDER BY record_date
+            """, (user_id, start_date, end_date))
             
-            # 防止SQL注入
-            query = """
-                SELECT record_date, SUM(duration) as total_duration, SUM(calories_burned) as total_calories
-                FROM exercise_records
-                WHERE user_id = ? AND record_date BETWEEN ? AND ?
-                GROUP BY record_date
-                ORDER BY record_date
-            """
-            
-            cursor.execute(query, (user_id, start_date, end_date))
-            results = cursor.fetchall()
-            
-            # 确保结果格式一致
-            summary = []
-            for row in results:
-                if row and len(row) >= 3:
-                    try:
-                        record_date = row[0] if row[0] else "未知日期"
-                        duration = int(row[1]) if row[1] is not None else 0
-                        calories = int(row[2]) if row[2] is not None else 0
-                        summary.append([record_date, duration, calories])
-                    except (ValueError, TypeError) as e:
-                        print(f"处理运动记录时出错: {e}, 行数据: {row}")
-                        # 添加默认值
-                        summary.append(["未知日期", 0, 0])
-            
-            print(f"已获取{len(summary)}天的运动总结")
-            return summary
+            return self.cursor.fetchall()
         except Exception as e:
-            print(f"获取每周运动总结时出错: {str(e)}")
-            # 返回空列表而不是None
-            return [] 
+            print(f"获取每周运动摘要出错: {str(e)}")
+            return []
+            
+    def get_weekly_diet_summary(self, user_id, start_date, end_date):
+        """获取每周饮食摘要，包含每日摄入的总卡路里、蛋白质、脂肪和碳水化合物"""
+        try:
+            self.cursor.execute("""
+            SELECT dr.record_date, 
+                   SUM(f.calories * dr.amount / f.standard_weight) AS total_calories,
+                   SUM(f.protein * dr.amount / f.standard_weight) AS total_protein,
+                   SUM(f.fat * dr.amount / f.standard_weight) AS total_fat,
+                   SUM(f.carbs * dr.amount / f.standard_weight) AS total_carbs
+            FROM diet_records dr
+            LEFT JOIN foods f ON dr.food_id = f.id
+            WHERE dr.user_id = ? AND dr.record_date BETWEEN ? AND ?
+            GROUP BY dr.record_date
+            ORDER BY dr.record_date
+            """, (user_id, start_date, end_date))
+            
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"获取每周饮食摘要出错: {str(e)}")
+            return []
+            
+    def get_weekly_sleep_summary(self, user_id, start_date, end_date):
+        """获取每周睡眠摘要，包含每日睡眠时长和质量"""
+        try:
+            self.cursor.execute("""
+            SELECT sleep_date, AVG(duration) AS avg_duration, AVG(quality) AS avg_quality
+            FROM sleep_records
+            WHERE user_id = ? AND sleep_date BETWEEN ? AND ?
+            GROUP BY sleep_date
+            ORDER BY sleep_date
+            """, (user_id, start_date, end_date))
+            
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"获取每周睡眠摘要出错: {str(e)}")
+            return []
+            
+    def get_user_profile_for_analysis(self, user_id):
+        """获取用户资料用于分析"""
+        try:
+            self.cursor.execute("""
+            SELECT gender, age, height, weight, diet_habit, exercise_habit, sleep_habit
+            FROM users 
+            WHERE id = ?
+            """, (user_id,))
+            
+            result = self.cursor.fetchone()
+            if result:
+                return {
+                    "gender": result[0],
+                    "age": result[1],
+                    "height": result[2],
+                    "weight": result[3],
+                    "diet_habit": result[4],
+                    "exercise_habit": result[5],
+                    "sleep_habit": result[6]
+                }
+            return None
+        except Exception as e:
+            print(f"获取用户资料出错: {str(e)}")
+            return None
+            
+    # 睡眠记录相关方法
+    @db_retry()
+    def add_sleep_record(self, user_id, sleep_date, sleep_time, wake_date, wake_time, duration, quality, notes=""):
+        """添加睡眠记录"""
+        try:
+            self.cursor.execute("""
+            INSERT INTO sleep_records 
+            (user_id, sleep_date, sleep_time, wake_date, wake_time, duration, quality, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, sleep_date, sleep_time, wake_date, wake_time, duration, quality, notes))
+            
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"添加睡眠记录出错: {str(e)}")
+            return False
+            
+    def get_sleep_records_by_date(self, user_id, date):
+        """获取指定日期的睡眠记录"""
+        try:
+            self.cursor.execute("""
+            SELECT * FROM sleep_records
+            WHERE user_id = ? AND (sleep_date = ? OR wake_date = ?)
+            ORDER BY sleep_date DESC, sleep_time DESC
+            """, (user_id, date, date))
+            
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"获取睡眠记录出错: {str(e)}")
+            return []
+            
+    def get_sleep_record_by_id(self, record_id):
+        """根据ID获取睡眠记录"""
+        try:
+            self.cursor.execute("""
+            SELECT * FROM sleep_records
+            WHERE id = ?
+            """, (record_id,))
+            
+            return self.cursor.fetchone()
+        except Exception as e:
+            print(f"获取睡眠记录出错: {str(e)}")
+            return None
+            
+    @db_retry()
+    def update_sleep_record(self, record_id, sleep_date=None, sleep_time=None, 
+                           wake_date=None, wake_time=None, duration=None, 
+                           quality=None, notes=None):
+        """更新睡眠记录"""
+        try:
+            # 获取现有记录
+            self.cursor.execute("SELECT * FROM sleep_records WHERE id = ?", (record_id,))
+            record = self.cursor.fetchone()
+            
+            if not record:
+                print(f"未找到ID为{record_id}的睡眠记录")
+                return False
+                
+            # 使用现有值作为默认值
+            sleep_date = sleep_date if sleep_date is not None else record[3]
+            sleep_time = sleep_time if sleep_time is not None else record[4]
+            wake_date = wake_date if wake_date is not None else record[5]
+            wake_time = wake_time if wake_time is not None else record[6]
+            duration = duration if duration is not None else record[7]
+            quality = quality if quality is not None else record[8]
+            notes = notes if notes is not None else record[9]
+            
+            # 更新记录
+            self.cursor.execute("""
+            UPDATE sleep_records
+            SET sleep_date = ?, sleep_time = ?, wake_date = ?, wake_time = ?,
+                duration = ?, quality = ?, notes = ?
+            WHERE id = ?
+            """, (sleep_date, sleep_time, wake_date, wake_time, duration, quality, notes, record_id))
+            
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"更新睡眠记录出错: {str(e)}")
+            return False
+            
+    def delete_sleep_record(self, record_id):
+        """删除睡眠记录"""
+        try:
+            self.cursor.execute("DELETE FROM sleep_records WHERE id = ?", (record_id,))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"删除睡眠记录出错: {str(e)}")
+            return False 

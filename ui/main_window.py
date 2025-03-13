@@ -1,3 +1,4 @@
+import datetime
 from PyQt5.QtWidgets import (QMainWindow, QCalendarWidget, QVBoxLayout, QHBoxLayout, 
                             QWidget, QPushButton, QLabel, QComboBox, QStackedWidget,
                             QAction, QToolBar, QMessageBox, QFrame, QTabWidget, QInputDialog, QMenu)
@@ -5,6 +6,9 @@ from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QIcon, QFont, QColor, QPalette, QCursor
 from ui.diet_view import DietView
 from ui.exercise_view import ExerciseView
+from utils.health_analyzer import HealthAnalyzer
+from utils.report_generator import WeeklyReportGenerator
+import os
 
 # 导入其他需要的视图类
 # 为缺少的视图创建基本视图类
@@ -116,9 +120,12 @@ class SleepView(BaseView):
     def load_sleep_records(self):
         """加载睡眠记录"""
         try:
+            # 确保导入QDate和QTableWidgetItem
+            from PyQt5.QtCore import QDate
+            from PyQt5.QtWidgets import QTableWidgetItem
+            
             # 确保有日期
             if not hasattr(self, 'current_date'):
-                from PyQt5.QtCore import QDate
                 self.current_date = QDate.currentDate().toString("yyyy-MM-dd")
                 
             # 从当前日期获取记录
@@ -183,11 +190,27 @@ class SleepView(BaseView):
             
     def add_sleep_record(self):
         """添加睡眠记录"""
-        QMessageBox.information(self, "提示", "睡眠记录功能暂未实现")
+        from ui.sleep_record import SleepRecordDialog
+        dialog = SleepRecordDialog(self.user_id, self.db_manager, self)
+        
+        # 在记录添加后刷新视图
+        def on_record_added():
+            self.load_sleep_records()
+            
+        dialog.record_added.connect(on_record_added)
+        dialog.exec_()
         
     def edit_sleep_record(self, record_id):
         """编辑睡眠记录"""
-        QMessageBox.information(self, "提示", f"编辑睡眠记录功能暂未实现 (ID: {record_id})")
+        from ui.sleep_record import SleepRecordDialog
+        dialog = SleepRecordDialog(self.user_id, self.db_manager, self, record_id)
+        
+        # 在记录更新后刷新视图
+        def on_record_added():
+            self.load_sleep_records()
+            
+        dialog.record_added.connect(on_record_added)
+        dialog.exec_()
         
     def delete_sleep_record(self, record_id):
         """删除睡眠记录"""
@@ -624,8 +647,16 @@ class MainWindow(QMainWindow):
         
     def add_sleep_record(self):
         """添加睡眠记录"""
-        # 这里可以添加睡眠记录功能
-        QMessageBox.information(self, "提示", "睡眠记录功能暂未实现")
+        from ui.sleep_record import SleepRecordDialog
+        dialog = SleepRecordDialog(self.user_id, self.db_manager, self)
+        
+        # 在记录添加后刷新视图
+        def on_record_added():
+            self.sleep_view.load_sleep_records()
+            self.load_date_data()
+            
+        dialog.record_added.connect(on_record_added)
+        dialog.exec_()
         
     def add_plan(self):
         """添加提醒计划"""
@@ -662,36 +693,184 @@ class MainWindow(QMainWindow):
         pass
         
     def show_weekly_report(self):
-        """显示每周报告"""
+        """显示周报告，包含运动、饮食、睡眠分析及健康建议，并支持导出为PDF"""
+        # 获取当前周的起止日期
+        today = datetime.datetime.now()
+        # 计算本周的第一天（周一）
+        week_start = today - datetime.timedelta(days=today.weekday())
+        week_start = datetime.datetime(week_start.year, week_start.month, week_start.day)
+        # 计算本周的最后一天（周日）
+        week_end = week_start + datetime.timedelta(days=6)
+        
+        # 获取用户信息
         try:
-            # 更新周报摘要
-            self.update_weekly_summary()
-            
-            # 获取周摘要文本
-            import datetime
-            today = datetime.date.today()
-            start_of_week = today - datetime.timedelta(days=today.weekday())
-            end_of_week = start_of_week + datetime.timedelta(days=6)
-            
-            # 格式化日期为字符串
-            start_date = start_of_week.strftime('%Y-%m-%d')
-            end_date = end_of_week.strftime('%Y-%m-%d')
-            
-            # 从数据库获取本周的运动数据
-            weekly_exercise = self.db_manager.get_weekly_exercise_summary(
-                self.user_id, start_date, end_date
+            user_info = self.db_manager.get_user_profile_for_analysis()
+        except Exception as e:
+            user_info = {}
+            print(f"获取用户信息失败: {e}")
+        
+        # 获取本周的运动、饮食、睡眠数据
+        try:
+            # 运动数据
+            exercise_summary = self.db_manager.get_weekly_exercise_summary(
+                week_start.strftime('%Y-%m-%d'), 
+                week_end.strftime('%Y-%m-%d')
             )
             
-            # 生成摘要文本
-            summary_text = self.generate_summary_text(weekly_exercise)
+            # 饮食数据
+            diet_summary = self.db_manager.get_weekly_diet_summary(
+                week_start.strftime('%Y-%m-%d'), 
+                week_end.strftime('%Y-%m-%d')
+            )
             
-            # 在对话框中显示周报信息
-            QMessageBox.information(self, "周报摘要", 
-                f"<h3>周运动摘要 ({start_date} 至 {end_date})</h3><p>{summary_text}</p>")
-            
+            # 睡眠数据
+            sleep_summary = self.db_manager.get_weekly_sleep_summary(
+                week_start.strftime('%Y-%m-%d'), 
+                week_end.strftime('%Y-%m-%d')
+            )
         except Exception as e:
-            QMessageBox.warning(self, "错误", f"生成周报时出错: {str(e)}")
+            QMessageBox.warning(self, "数据获取错误", f"获取周数据失败: {e}")
+            return
         
+        # 分析健康数据并生成建议
+        analyzer = HealthAnalyzer()
+        analysis_results = analyzer.analyze_weekly_data(
+            exercise_summary, 
+            diet_summary, 
+            sleep_summary, 
+            user_info
+        )
+        
+        # 创建周报摘要文本
+        summary_text = self._generate_weekly_summary_text(analysis_results, week_start, week_end)
+        
+        # 显示周报摘要对话框
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("本周健康报告")
+        msg_box.setText(summary_text)
+        msg_box.setDetailedText(self._generate_detailed_report_text(analysis_results))
+        
+        # 添加导出PDF按钮
+        export_btn = msg_box.addButton("导出PDF报告", QMessageBox.ActionRole)
+        msg_box.addButton(QMessageBox.Ok)
+        
+        msg_box.exec_()
+        
+        # 处理导出PDF请求
+        if msg_box.clickedButton() == export_btn:
+            self._export_weekly_report_pdf(analysis_results, user_info, week_start, week_end)
+
+    def _generate_weekly_summary_text(self, analysis_results, week_start, week_end):
+        """生成周报摘要文本"""
+        exercise_stats = analysis_results.get("exercise_stats", {})
+        diet_stats = analysis_results.get("diet_stats", {})
+        sleep_stats = analysis_results.get("sleep_stats", {})
+        
+        summary = f"健康周报 ({week_start.strftime('%Y-%m-%d')} 至 {week_end.strftime('%Y-%m-%d')})\n\n"
+        
+        # 运动摘要
+        summary += "【运动情况】\n"
+        summary += f"- 运动天数: {exercise_stats.get('exercise_days', 0)}/7天\n"
+        summary += f"- 总运动时间: {exercise_stats.get('total_duration', 0)}分钟\n"
+        summary += f"- 总消耗卡路里: {exercise_stats.get('total_calories', 0)}卡路里\n"
+        
+        # 饮食摘要
+        summary += "\n【饮食情况】\n"
+        summary += f"- 平均每日摄入热量: {diet_stats.get('avg_calories_per_day', 0):.1f}卡路里\n"
+        summary += f"- 蛋白质摄入比例: {diet_stats.get('protein_ratio', 0):.1f}%\n"
+        summary += f"- 脂肪摄入比例: {diet_stats.get('fat_ratio', 0):.1f}%\n"
+        summary += f"- 碳水摄入比例: {diet_stats.get('carbs_ratio', 0):.1f}%\n"
+        
+        # 睡眠摘要
+        summary += "\n【睡眠情况】\n"
+        summary += f"- 睡眠记录天数: {sleep_stats.get('sleep_days', 0)}/7天\n"
+        summary += f"- 平均睡眠时长: {sleep_stats.get('avg_duration_per_day', 0) / 60:.1f}小时\n"
+        summary += f"- 平均睡眠质量: {sleep_stats.get('avg_quality', 0):.1f}/5分\n"
+        
+        # 主要健康建议
+        summary += "\n【主要健康建议】\n"
+        if analysis_results.get("overall_advice"):
+            for i, advice in enumerate(analysis_results.get("overall_advice")[:3], 1):
+                summary += f"{i}. {advice}\n"
+        else:
+            summary += "暂无建议\n"
+        
+        summary += "\n点击\"显示详情\"查看完整分析，或导出PDF报告获取更详细的内容。"
+        return summary
+
+    def _generate_detailed_report_text(self, analysis_results):
+        """生成详细报告文本"""
+        detailed_text = "详细健康分析报告\n\n"
+        
+        # 运动建议
+        detailed_text += "【运动建议】\n"
+        if analysis_results.get("exercise_advice"):
+            for advice in analysis_results.get("exercise_advice"):
+                detailed_text += f"- {advice}\n"
+        else:
+            detailed_text += "暂无运动建议\n"
+        
+        # 饮食建议
+        detailed_text += "\n【饮食建议】\n"
+        if analysis_results.get("diet_advice"):
+            for advice in analysis_results.get("diet_advice"):
+                detailed_text += f"- {advice}\n"
+        else:
+            detailed_text += "暂无饮食建议\n"
+        
+        # 睡眠建议
+        detailed_text += "\n【睡眠建议】\n"
+        if analysis_results.get("sleep_advice"):
+            for advice in analysis_results.get("sleep_advice"):
+                detailed_text += f"- {advice}\n"
+        else:
+            detailed_text += "暂无睡眠建议\n"
+        
+        # 整体健康建议
+        detailed_text += "\n【整体健康建议】\n"
+        if analysis_results.get("overall_advice"):
+            for advice in analysis_results.get("overall_advice"):
+                detailed_text += f"- {advice}\n"
+        else:
+            detailed_text += "暂无整体健康建议\n"
+        
+        return detailed_text
+
+    def _export_weekly_report_pdf(self, analysis_results, user_info, week_start, week_end):
+        """导出周报告为PDF文件"""
+        try:
+            # 创建报告生成器
+            report_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports")
+            report_generator = WeeklyReportGenerator(analysis_results, user_info, output_dir=report_dir)
+            
+            # 生成PDF文件
+            filename = f"健康周报_{week_start.strftime('%Y%m%d')}-{week_end.strftime('%Y%m%d')}.pdf"
+            pdf_path = report_generator.generate_pdf(filename)
+            
+            # 显示成功消息
+            QMessageBox.information(
+                self, 
+                "导出成功", 
+                f"健康周报已成功导出到:\n{pdf_path}\n\n是否打开文件?", 
+                QMessageBox.Yes | QMessageBox.No
+            )
+            
+            # 如果用户选择打开文件
+            if QMessageBox.Yes:
+                # 使用系统默认程序打开PDF文件
+                import platform
+                import subprocess
+                
+                if platform.system() == 'Windows':
+                    os.startfile(pdf_path)
+                elif platform.system() == 'Darwin':  # macOS
+                    subprocess.call(('open', pdf_path))
+                else:  # Linux
+                    subprocess.call(('xdg-open', pdf_path))
+                
+        except Exception as e:
+            QMessageBox.warning(self, "导出失败", f"导出PDF报告失败: {e}")
+
     def view_reminders(self):
         """查看所有提醒"""
         from ui.reminder import ReminderView
