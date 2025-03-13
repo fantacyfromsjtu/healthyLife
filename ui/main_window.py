@@ -60,50 +60,181 @@ class BaseView(QWidget):
         pass
 
 
-class AllView(BaseView):
-    """所有内容综合视图"""
-    
-    def init_ui(self):
-        """初始化用户界面"""
-        super().init_ui()
-        self.title_label.setText("全部内容")
-    
-    def update_date(self, selected_date):
-        """更新日期"""
-        super().update_date(selected_date)
-        
-        # 检查日期类型，如果是字符串则使用原样显示
-        if isinstance(selected_date, str):
-            date_str = selected_date
-        else:
-            date_str = selected_date.toString('yyyy-MM-dd')
-            
-        self.content_label.setText(f"全部内容 - {date_str}\n暂无数据")
-
-    def update_summary(self, summary_text):
-        """更新摘要内容"""
-        self.content_label.setText(summary_text)
-
-
 class SleepView(BaseView):
     """睡眠记录视图"""
     
     def init_ui(self):
         """初始化用户界面"""
+        # 调用父类初始化
         super().init_ui()
-        self.title_label.setText("睡眠记录")
-    
-    def update_date(self, selected_date):
-        """更新日期"""
-        super().update_date(selected_date)
         
-        # 检查日期类型，如果是字符串则使用原样显示
-        if isinstance(selected_date, str):
-            date_str = selected_date
-        else:
-            date_str = selected_date.toString('yyyy-MM-dd')
+        # 设置标题
+        self.title_label.setText("睡眠记录")
+        
+        # 自定义内容
+        self.content_layout = QVBoxLayout()
+        
+        # 创建表格展示
+        from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
+        self.sleep_table = QTableWidget()
+        self.sleep_table.setColumnCount(5)
+        self.sleep_table.setHorizontalHeaderLabels(["入睡时间", "起床时间", "睡眠时长", "质量", "备注"])
+        self.sleep_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.sleep_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.sleep_table.setEditTriggers(QTableWidget.NoEditTriggers)  # 设置为不可编辑
+        
+        # 允许右键菜单
+        self.sleep_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.sleep_table.customContextMenuRequested.connect(self.show_context_menu)
+        
+        self.content_layout.addWidget(self.sleep_table)
+        
+        # 添加一个添加按钮
+        self.add_button = QPushButton("添加睡眠记录")
+        self.add_button.setObjectName("primaryButton")
+        self.add_button.clicked.connect(self.add_sleep_record)
+        
+        self.content_layout.addWidget(self.add_button)
+        
+        # 替换原始布局中的内容标签
+        layout = self.layout()
+        layout.removeWidget(self.content_label)
+        self.content_label.deleteLater()
+        layout.addLayout(self.content_layout)
+        
+    def update_date(self, selected_date):
+        """更新视图显示的日期"""
+        try:
+            # 保存当前日期
+            self.current_date = selected_date
             
-        self.content_label.setText(f"睡眠记录 - {date_str}\n暂无数据")
+            # 加载睡眠记录
+            self.load_sleep_records()
+        except Exception as e:
+            print(f"更新睡眠视图日期时出错: {str(e)}")
+            
+    def load_sleep_records(self):
+        """加载睡眠记录"""
+        try:
+            # 确保有日期
+            if not hasattr(self, 'current_date'):
+                from PyQt5.QtCore import QDate
+                self.current_date = QDate.currentDate().toString("yyyy-MM-dd")
+                
+            # 从当前日期获取记录
+            if isinstance(self.current_date, QDate):
+                date_str = self.current_date.toString("yyyy-MM-dd")
+            else:
+                date_str = self.current_date
+                
+            # 加载睡眠记录
+            records = self.db_manager.get_sleep_records_by_date(self.user_id, date_str)
+            
+            # 清空表格
+            self.sleep_table.setRowCount(0)
+            
+            # 如果没有记录
+            if not records or len(records) == 0:
+                self.title_label.setText(f"睡眠记录 ({date_str}) - 暂无数据")
+                return
+                
+            # 设置表格行数
+            self.sleep_table.setRowCount(len(records))
+            
+            # 填充表格
+            for row, record in enumerate(records):
+                # 提取记录详情
+                record_id = record[0]
+                sleep_date = record[3]
+                sleep_time = record[4]
+                wake_date = record[5]
+                wake_time = record[6]
+                duration = record[7]  # 单位为分钟
+                quality = record[8]
+                notes = record[9]
+                
+                # 计算可读的睡眠时长
+                hours = duration // 60
+                minutes = duration % 60
+                duration_text = f"{hours}小时{minutes}分钟"
+                
+                # 将睡眠质量转换为文本
+                quality_map = {0: "未评价", 1: "很差", 2: "较差", 3: "一般", 4: "良好", 5: "优秀"}
+                quality_text = quality_map.get(quality, "未知")
+                
+                # 设置单元格内容
+                self.sleep_table.setItem(row, 0, QTableWidgetItem(f"{sleep_date} {sleep_time}"))
+                self.sleep_table.setItem(row, 1, QTableWidgetItem(f"{wake_date} {wake_time}"))
+                self.sleep_table.setItem(row, 2, QTableWidgetItem(duration_text))
+                self.sleep_table.setItem(row, 3, QTableWidgetItem(quality_text))
+                self.sleep_table.setItem(row, 4, QTableWidgetItem(notes))
+                
+                # 存储记录ID供后续操作使用
+                for col in range(5):
+                    self.sleep_table.item(row, col).setData(Qt.UserRole, record_id)
+                    
+            # 更新标题
+            self.title_label.setText(f"睡眠记录 ({date_str}) - {len(records)}条")
+                
+        except Exception as e:
+            print(f"加载睡眠记录时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+    def add_sleep_record(self):
+        """添加睡眠记录"""
+        QMessageBox.information(self, "提示", "睡眠记录功能暂未实现")
+        
+    def edit_sleep_record(self, record_id):
+        """编辑睡眠记录"""
+        QMessageBox.information(self, "提示", f"编辑睡眠记录功能暂未实现 (ID: {record_id})")
+        
+    def delete_sleep_record(self, record_id):
+        """删除睡眠记录"""
+        reply = QMessageBox.question(
+            self, 
+            "确认删除", 
+            "确定要删除这条睡眠记录吗？此操作不可撤销。",
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                if self.db_manager.delete_sleep_record(record_id):
+                    QMessageBox.information(self, "成功", "睡眠记录已删除。")
+                    # 重新加载记录
+                    self.load_sleep_records()
+                else:
+                    QMessageBox.warning(self, "失败", "删除睡眠记录失败，请重试。")
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"删除睡眠记录时出错: {str(e)}")
+                
+    def show_context_menu(self, position):
+        """显示右键菜单"""
+        # 获取当前选中行
+        indexes = self.sleep_table.selectedIndexes()
+        if indexes:
+            # 创建菜单
+            menu = QMenu()
+            
+            # 获取记录ID
+            record_id = indexes[0].data(Qt.UserRole)
+            
+            # 添加编辑选项
+            edit_action = menu.addAction("编辑")
+            edit_action.triggered.connect(lambda: self.edit_sleep_record(record_id))
+            
+            # 添加删除选项
+            delete_action = menu.addAction("删除")
+            delete_action.triggered.connect(lambda: self.delete_sleep_record(record_id))
+            
+            # 显示菜单
+            menu.exec_(self.sleep_table.viewport().mapToGlobal(position))
+            
+    def load_data(self):
+        """加载数据"""
+        self.load_sleep_records()
 
 
 class PlanView(BaseView):
@@ -292,7 +423,7 @@ class MainWindow(QMainWindow):
         mode_label.setObjectName("modeLabel")
         self.mode_combo = QComboBox()
         self.mode_combo.setObjectName("modeCombo")
-        self.mode_combo.addItems(["全部", "饮食", "运动", "睡眠", "计划"])
+        self.mode_combo.addItems(["饮食", "运动", "睡眠", "计划"])
         self.mode_combo.currentIndexChanged.connect(self.mode_changed)
         self.mode_combo.setMinimumHeight(30)
         mode_layout.addWidget(mode_label)
@@ -305,14 +436,12 @@ class MainWindow(QMainWindow):
         self.content_stack.setObjectName("contentStack")
         
         # 创建各种视图
-        self.all_view = AllView(self.user_id, self.db_manager)
         self.diet_view = DietView(self.user_id, self.db_manager)
         self.exercise_view = ExerciseView(self.user_id, self.db_manager)
         self.sleep_view = SleepView(self.user_id, self.db_manager)
         self.plan_view = PlanView(self.user_id, self.db_manager)
         
         # 添加视图到堆叠部件
-        self.content_stack.addWidget(self.all_view)
         self.content_stack.addWidget(self.diet_view)
         self.content_stack.addWidget(self.exercise_view)
         self.content_stack.addWidget(self.sleep_view)
@@ -324,54 +453,34 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(left_widget, 1)
         main_layout.addWidget(right_widget, 2)
         
-        # 创建菜单和工具栏
-        self.create_menus()
+        # 创建工具栏
+        self.create_toolbar()
         
-    def create_menus(self):
-        """创建菜单和工具栏"""
-        # 文件菜单
-        file_menu = self.menuBar().addMenu("文件")
-        
-        export_action = QAction("导出报告", self)
-        export_action.triggered.connect(self.export_report)
-        file_menu.addAction(export_action)
-        
-        exit_action = QAction("退出", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        
-        # 用户菜单
-        user_menu = self.menuBar().addMenu("用户")
-        
-        profile_action = QAction("个人信息", self)
-        profile_action.triggered.connect(self.edit_profile)
-        user_menu.addAction(profile_action)
-        
-        # 报告菜单
-        report_menu = self.menuBar().addMenu("报告")
-        
-        daily_report_action = QAction("每日报告", self)
-        daily_report_action.triggered.connect(self.show_daily_report)
-        report_menu.addAction(daily_report_action)
-        
-        weekly_report_action = QAction("每周报告", self)
-        weekly_report_action.triggered.connect(self.show_weekly_report)
-        report_menu.addAction(weekly_report_action)
-        
-        # 添加"查看提醒"菜单项
-        tools_menu = self.menuBar().addMenu("工具")
-        
-        view_reminders_action = QAction("查看提醒", self)
-        view_reminders_action.triggered.connect(self.view_reminders)
-        tools_menu.addAction(view_reminders_action)
-        
-        # 工具栏
-        toolbar = QToolBar("主工具栏")
+    def create_toolbar(self):
+        """创建工具栏"""
+        # 创建简化版的工具栏，只包含必要功能
+        toolbar = QToolBar("快速工具栏")
         self.addToolBar(toolbar)
         
+        # 添加个人信息按钮到工具栏
+        profile_action = QAction("个人信息", self)
+        profile_action.triggered.connect(self.edit_profile)
         toolbar.addAction(profile_action)
-        toolbar.addAction(daily_report_action)
+        
+        # 添加周报按钮到工具栏
+        weekly_report_action = QAction("周报摘要", self)
+        weekly_report_action.triggered.connect(self.show_weekly_report)
         toolbar.addAction(weekly_report_action)
+        
+        # 添加查看提醒按钮到工具栏
+        view_reminders_action = QAction("查看提醒", self)
+        view_reminders_action.triggered.connect(self.view_reminders)
+        toolbar.addAction(view_reminders_action)
+        
+        # 添加退出按钮到工具栏
+        exit_action = QAction("退出", self)
+        exit_action.triggered.connect(self.close)
+        toolbar.addAction(exit_action)
         
     def update_date_label(self):
         """更新日期标签"""
@@ -446,50 +555,34 @@ class MainWindow(QMainWindow):
                 print(f"调用load_data出错: {str(e)}")
                 
         # 特殊处理各种视图类型
-        if current_index == 1 and hasattr(self.diet_view, 'load_diet_records'):  # 饮食视图
+        if current_index == 0 and hasattr(self.diet_view, 'load_diet_records'):  # 饮食视图
             self.diet_view.load_diet_records()
-        elif current_index == 2 and hasattr(self.exercise_view, 'load_exercise_records'):  # 运动视图
+        elif current_index == 1 and hasattr(self.exercise_view, 'load_exercise_records'):  # 运动视图
             self.exercise_view.load_exercise_records()
-        elif current_index == 4 and hasattr(self.plan_view, 'load_reminders'):  # 计划视图
+        elif current_index == 2 and hasattr(self.sleep_view, 'load_sleep_records'):  # 睡眠视图
+            self.sleep_view.load_sleep_records()
+        elif current_index == 3 and hasattr(self.plan_view, 'load_reminders'):  # 计划视图
             self.plan_view.load_reminders()
         
     def add_record(self):
         """添加记录"""
-        current_index = self.content_stack.currentIndex()
-        print(f"添加记录: 当前视图索引 = {current_index}")
+        # 显示一个选项菜单让用户选择要添加的记录类型
+        menu = QMenu(self)
+        diet_action = menu.addAction("添加饮食记录")
+        exercise_action = menu.addAction("添加运动记录")
+        sleep_action = menu.addAction("添加睡眠记录")
         
-        # 根据当前视图索引决定添加什么类型的记录
-        if current_index == 0:  # 全部视图
-            # 显示一个选项菜单让用户选择要添加的记录类型
-            menu = QMenu(self)
-            diet_action = menu.addAction("添加饮食记录")
-            exercise_action = menu.addAction("添加运动记录")
-            plan_action = menu.addAction("添加计划提醒")
-            
-            diet_action.triggered.connect(self.add_diet_record)
-            exercise_action.triggered.connect(self.add_exercise_record)
-            plan_action.triggered.connect(self.add_plan)
-            
-            # 在按钮位置显示菜单
-            button = self.sender()
-            if button:
-                menu.exec_(button.mapToGlobal(button.rect().bottomLeft()))
-            else:
-                menu.exec_(QCursor.pos())
-                
-        elif current_index == 1:  # 饮食视图
-            self.add_diet_record()
-        elif current_index == 2:  # 运动视图
-            self.add_exercise_record()
-        elif current_index == 3:  # 睡眠视图
-            # 这里可以添加睡眠记录功能
-            QMessageBox.information(self, "提示", "睡眠记录功能暂未实现")
-        elif current_index == 4:  # 计划视图
-            self.add_plan()
+        diet_action.triggered.connect(self.add_diet_record)
+        exercise_action.triggered.connect(self.add_exercise_record)
+        sleep_action.triggered.connect(self.add_sleep_record)
+        
+        # 在按钮位置显示菜单
+        button = self.sender()
+        if button:
+            menu.exec_(button.mapToGlobal(button.rect().bottomLeft()))
         else:
-            print(f"未知的视图索引: {current_index}")
-            QMessageBox.warning(self, "错误", "无法确定要添加的记录类型")
-    
+            menu.exec_(QCursor.pos())
+        
     def add_diet_record(self):
         """添加饮食记录"""
         if hasattr(self.diet_view, 'add_diet_record'):
@@ -529,6 +622,11 @@ class MainWindow(QMainWindow):
         dialog.record_added.connect(on_record_added)
         dialog.exec_()
         
+    def add_sleep_record(self):
+        """添加睡眠记录"""
+        # 这里可以添加睡眠记录功能
+        QMessageBox.information(self, "提示", "睡眠记录功能暂未实现")
+        
     def add_plan(self):
         """添加提醒计划"""
         from ui.reminder import ReminderDialog
@@ -544,15 +642,11 @@ class MainWindow(QMainWindow):
             self.load_date_data()
             
             # 如果当前是计划视图，还需要额外刷新
-            if self.content_stack.currentIndex() == 4:  # 计划视图索引
-                self.mode_changed(4)
+            if self.content_stack.currentIndex() == 3:  # 计划视图索引
+                self.mode_changed(3)
                 
         dialog.reminder_updated.connect(on_reminder_updated)
         dialog.exec_()
-        
-    def export_report(self):
-        """导出报告"""
-        QMessageBox.information(self, "提示", "导出报告功能正在开发中...")
         
     def edit_profile(self):
         """编辑个人信息"""
@@ -567,20 +661,34 @@ class MainWindow(QMainWindow):
         # 例如更新欢迎消息等
         pass
         
-    def show_daily_report(self):
-        """显示每日报告"""
-        QMessageBox.information(self, "提示", "每日报告功能正在开发中...")
-        
     def show_weekly_report(self):
         """显示每周报告"""
         try:
             # 更新周报摘要
             self.update_weekly_summary()
             
-            # 切换到全部模式显示周报
-            self.mode_combo.setCurrentIndex(0)  # 全部模式
+            # 获取周摘要文本
+            import datetime
+            today = datetime.date.today()
+            start_of_week = today - datetime.timedelta(days=today.weekday())
+            end_of_week = start_of_week + datetime.timedelta(days=6)
             
-            QMessageBox.information(self, "周报", "周报已生成并在全部模式中显示！")
+            # 格式化日期为字符串
+            start_date = start_of_week.strftime('%Y-%m-%d')
+            end_date = end_of_week.strftime('%Y-%m-%d')
+            
+            # 从数据库获取本周的运动数据
+            weekly_exercise = self.db_manager.get_weekly_exercise_summary(
+                self.user_id, start_date, end_date
+            )
+            
+            # 生成摘要文本
+            summary_text = self.generate_summary_text(weekly_exercise)
+            
+            # 在对话框中显示周报信息
+            QMessageBox.information(self, "周报摘要", 
+                f"<h3>周运动摘要 ({start_date} 至 {end_date})</h3><p>{summary_text}</p>")
+            
         except Exception as e:
             QMessageBox.warning(self, "错误", f"生成周报时出错: {str(e)}")
         
@@ -591,42 +699,43 @@ class MainWindow(QMainWindow):
         self.reminder_view.show()
 
     def update_weekly_summary(self):
-        """更新每周运动和饮食总结"""
+        """更新周摘要信息"""
         try:
-            print("更新每周总结...")
-            # 获取当前周的开始和结束日期
-            today = QDate.currentDate()
-            days_to_sunday = today.dayOfWeek() % 7  # 周日为0，周一为1，...，周六为6
-            start_date = today.addDays(-days_to_sunday).toString("yyyy-MM-dd")
-            end_date = today.addDays(6 - days_to_sunday).toString("yyyy-MM-dd")
+            import datetime
             
-            print(f"周期: {start_date} 到 {end_date}")
+            print("更新每周运动摘要...")
             
-            # 获取每周运动总结
+            # 获取当前周的起止日期
+            today = datetime.date.today()
+            start_of_week = today - datetime.timedelta(days=today.weekday())
+            end_of_week = start_of_week + datetime.timedelta(days=6)
+            
+            # 格式化日期为字符串
+            start_date = start_of_week.strftime('%Y-%m-%d')
+            end_date = end_of_week.strftime('%Y-%m-%d')
+            
+            # 从数据库获取本周的运动数据
             try:
                 weekly_exercise = self.db_manager.get_weekly_exercise_summary(
-                    self.user_id, start_date, end_date)
-                print(f"获取到每周运动总结: {weekly_exercise}")
-                
-                # 防止空值错误
-                if weekly_exercise is None:
-                    print("警告: 运动总结为None，使用空列表")
-                    weekly_exercise = []
-                
-                # 更新所有视图的总结
-                if hasattr(self, 'all_view') and self.all_view:
-                    summary_text = self.generate_summary_text(weekly_exercise)
-                    self.all_view.update_summary(summary_text)
+                    self.user_id, start_date, end_date
+                )
+                print(f"获取到周运动数据: {len(weekly_exercise) if weekly_exercise else 0}条记录")
             except Exception as e:
-                print(f"更新运动总结时出错: {str(e)}")
-                # 提供默认值避免后续错误
-                weekly_exercise = []
-                if hasattr(self, 'all_view') and self.all_view:
-                    self.all_view.update_summary("本周暂无运动数据")
+                print(f"获取周运动数据时出错: {str(e)}")
+                weekly_exercise = []  # 确保不会因空值报错
+            
+            # 生成摘要文本
+            summary_text = self.generate_summary_text(weekly_exercise)
+            
+            # 更新UI显示
+            # 注意：不再使用all_view显示摘要，可以考虑在状态栏或其他地方显示
+            status_bar = self.statusBar()
+            status_bar.showMessage(f"本周摘要: {summary_text}")
         except Exception as e:
-            print(f"更新每周总结出错: {str(e)}")
-            # 避免错误传播
-    
+            print(f"更新周摘要时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
     def generate_summary_text(self, weekly_exercise):
         """生成摘要文本"""
         try:
