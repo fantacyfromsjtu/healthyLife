@@ -12,17 +12,22 @@ class HealthAnalyzer:
         """
         self.user_profile = user_profile or {}
         
-    def analyze_weekly_data(self, exercise_data, diet_data, sleep_data):
+    def analyze_weekly_data(self, exercise_data, diet_data, sleep_data, user_profile=None):
         """分析每周健康数据，生成报告和建议
         
         参数:
             exercise_data: 运动数据列表 [(日期, 总时长, 消耗卡路里), ...]
             diet_data: 饮食数据列表 [(日期, 总卡路里, 蛋白质, 脂肪, 碳水), ...]
             sleep_data: 睡眠数据列表 [(日期, 平均时长, 平均质量), ...]
+            user_profile: 用户资料，包含性别、年龄、身高、体重等信息（可选）
             
         返回:
             包含分析结果和建议的字典
         """
+        # 如果提供了用户资料，则更新
+        if user_profile:
+            self.user_profile = user_profile
+            
         # 对数据进行预处理，确保日期可比较
         exercise_dict = {record[0]: (record[1], record[2]) for record in exercise_data} if exercise_data else {}
         diet_dict = {record[0]: (record[1], record[2], record[3], record[4]) for record in diet_data} if diet_data else {}

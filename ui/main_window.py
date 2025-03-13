@@ -704,7 +704,7 @@ class MainWindow(QMainWindow):
         
         # 获取用户信息
         try:
-            user_info = self.db_manager.get_user_profile_for_analysis()
+            user_info = self.db_manager.get_user_profile_for_analysis(self.user_id)
         except Exception as e:
             user_info = {}
             print(f"获取用户信息失败: {e}")
@@ -713,18 +713,21 @@ class MainWindow(QMainWindow):
         try:
             # 运动数据
             exercise_summary = self.db_manager.get_weekly_exercise_summary(
+                self.user_id,
                 week_start.strftime('%Y-%m-%d'), 
                 week_end.strftime('%Y-%m-%d')
             )
             
             # 饮食数据
             diet_summary = self.db_manager.get_weekly_diet_summary(
+                self.user_id,
                 week_start.strftime('%Y-%m-%d'), 
                 week_end.strftime('%Y-%m-%d')
             )
             
             # 睡眠数据
             sleep_summary = self.db_manager.get_weekly_sleep_summary(
+                self.user_id,
                 week_start.strftime('%Y-%m-%d'), 
                 week_end.strftime('%Y-%m-%d')
             )
@@ -743,22 +746,182 @@ class MainWindow(QMainWindow):
         
         # 创建周报摘要文本
         summary_text = self._generate_weekly_summary_text(analysis_results, week_start, week_end)
+        detailed_text = self._generate_detailed_report_text(analysis_results)
         
-        # 显示周报摘要对话框
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("本周健康报告")
-        msg_box.setText(summary_text)
-        msg_box.setDetailedText(self._generate_detailed_report_text(analysis_results))
+        # 创建自定义对话框，左右分栏显示摘要和详情
+        self._show_report_dialog(summary_text, detailed_text, analysis_results, user_info, week_start, week_end)
+
+    def _show_report_dialog(self, summary_text, detailed_text, analysis_results, user_info, week_start, week_end):
+        """显示优化的报告对话框"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, QLabel, QScrollArea, QSplitter, QFrame
+        from PyQt5.QtGui import QFont, QColor, QPalette
         
-        # 添加导出PDF按钮
-        export_btn = msg_box.addButton("导出PDF报告", QMessageBox.ActionRole)
-        msg_box.addButton(QMessageBox.Ok)
+        # 创建对话框
+        dialog = QDialog(self)
+        dialog.setWindowTitle("健康周报")
+        dialog.resize(1500, 1000)  # 设置更大的默认尺寸
         
-        msg_box.exec_()
+        # 主布局
+        main_layout = QVBoxLayout(dialog)
+        main_layout.setContentsMargins(20, 20, 20, 20)  # 设置边距
+        main_layout.setSpacing(15)  # 设置组件间距
         
-        # 处理导出PDF请求
-        if msg_box.clickedButton() == export_btn:
-            self._export_weekly_report_pdf(analysis_results, user_info, week_start, week_end)
+        # 创建标题区域，缩小标题栏宽度至原来的四分之一
+        title_layout = QHBoxLayout()
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        
+        title_container = QWidget()
+        title_container.setMaximumWidth(800)
+        title_container.setMaximumHeight(150)
+        title_container_layout = QVBoxLayout(title_container)
+        title_container_layout.setContentsMargins(0, 0, 0, 0)
+        
+        title_label = QLabel(f"健康周报 ({week_start.strftime('%Y-%m-%d')} 至 {week_end.strftime('%Y-%m-%d')})")
+        title_font = QFont("Arial", 18)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet("color: #2C3E50;")
+        title_label.setWordWrap(True)  # 允许标题文字换行
+        title_container_layout.addWidget(title_label)
+        
+        title_layout.addWidget(title_container)
+        title_layout.addStretch()
+        main_layout.addLayout(title_layout)
+        
+        # 添加分隔线
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background-color: #BDC3C7;")
+        main_layout.addWidget(separator)
+        
+        # 创建分割器，允许用户调整左右宽度
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setHandleWidth(6)  # 稍微加宽分隔线
+        splitter.setStyleSheet("QSplitter::handle { background-color: #E0E0E0; }")
+        
+        # 左侧摘要部分
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(5, 5, 5, 5)
+        left_layout.setSpacing(10)
+        
+        # 摘要标题
+        summary_title = QLabel("摘要")
+        summary_title.setFont(QFont("Arial", 14, QFont.Bold))
+        summary_title.setStyleSheet("color: #27AE60; padding: 5px 0;")
+        left_layout.addWidget(summary_title)
+        
+        # 摘要内容
+        summary_edit = QTextEdit()
+        summary_edit.setReadOnly(True)
+        summary_edit.setPlainText(summary_text)
+        summary_edit.setStyleSheet("""
+            QTextEdit { 
+                font-size: 11pt; 
+                background-color: #F5F5F5; 
+                border: 1px solid #E0E0E0;
+                border-radius: 5px;
+                padding: 10px;
+                line-height: 1.5;
+            }
+        """)
+        left_layout.addWidget(summary_edit)
+        
+        # 右侧详情部分
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(5, 5, 5, 5)
+        right_layout.setSpacing(10)
+        
+        # 详情标题
+        detail_title = QLabel("详细分析")
+        detail_title.setFont(QFont("Arial", 14, QFont.Bold))
+        detail_title.setStyleSheet("color: #2980B9; padding: 5px 0;")
+        right_layout.addWidget(detail_title)
+        
+        # 详情内容
+        detail_edit = QTextEdit()
+        detail_edit.setReadOnly(True)
+        detail_edit.setPlainText(detailed_text)
+        detail_edit.setStyleSheet("""
+            QTextEdit { 
+                font-size: 11pt; 
+                background-color: #F5F5F5; 
+                border: 1px solid #E0E0E0;
+                border-radius: 5px;
+                padding: 10px;
+                line-height: 1.5;
+            }
+        """)
+        right_layout.addWidget(detail_edit)
+        
+        # 添加到分割器
+        splitter.addWidget(left_widget)
+        splitter.addWidget(right_widget)
+        
+        # 设置初始分割比例（左:右 = 4:6）
+        splitter.setSizes([480, 720])
+        
+        # 添加分割器到主布局
+        main_layout.addWidget(splitter)
+        
+        # 底部按钮区域
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 10, 0, 0)  # 顶部增加间距
+        
+        # 导出PDF按钮
+        export_btn = QPushButton("导出PDF报告")
+        export_btn.setMinimumHeight(40)
+        export_btn.setMinimumWidth(150)
+        export_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2980B9;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                font-size: 12pt;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3498DB;
+            }
+            QPushButton:pressed {
+                background-color: #1C6EA4;
+            }
+        """)
+        export_btn.clicked.connect(lambda: self._export_weekly_report_pdf(analysis_results, user_info, week_start, week_end))
+        
+        # 关闭按钮
+        close_btn = QPushButton("关闭")
+        close_btn.setMinimumHeight(40)
+        close_btn.setMinimumWidth(120)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #95A5A6;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                font-size: 12pt;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #BDC3C7;
+            }
+            QPushButton:pressed {
+                background-color: #7F8C8D;
+            }
+        """)
+        close_btn.clicked.connect(dialog.accept)
+        
+        button_layout.addWidget(export_btn)
+        button_layout.addStretch()
+        button_layout.addWidget(close_btn)
+        
+        main_layout.addLayout(button_layout)
+        
+        # 显示对话框
+        dialog.exec_()
 
     def _generate_weekly_summary_text(self, analysis_results, week_start, week_end):
         """生成周报摘要文本"""
@@ -845,31 +1008,58 @@ class MainWindow(QMainWindow):
             
             # 生成PDF文件
             filename = f"健康周报_{week_start.strftime('%Y%m%d')}-{week_end.strftime('%Y%m%d')}.pdf"
-            pdf_path = report_generator.generate_pdf(filename)
             
-            # 显示成功消息
-            QMessageBox.information(
-                self, 
-                "导出成功", 
-                f"健康周报已成功导出到:\n{pdf_path}\n\n是否打开文件?", 
-                QMessageBox.Yes | QMessageBox.No
-            )
-            
-            # 如果用户选择打开文件
-            if QMessageBox.Yes:
-                # 使用系统默认程序打开PDF文件
-                import platform
-                import subprocess
+            try:
+                pdf_path = report_generator.generate_pdf(filename)
                 
-                if platform.system() == 'Windows':
-                    os.startfile(pdf_path)
-                elif platform.system() == 'Darwin':  # macOS
-                    subprocess.call(('open', pdf_path))
-                else:  # Linux
-                    subprocess.call(('xdg-open', pdf_path))
+                # 显示成功消息
+                response = QMessageBox.information(
+                    self, 
+                    "导出成功", 
+                    f"健康周报已成功导出到:\n{pdf_path}\n\n是否打开文件?", 
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                
+                # 如果用户选择打开文件
+                if response == QMessageBox.Yes:
+                    # 使用系统默认程序打开PDF文件
+                    import platform
+                    import subprocess
+                    
+                    if platform.system() == 'Windows':
+                        os.startfile(pdf_path)
+                    elif platform.system() == 'Darwin':  # macOS
+                        subprocess.call(('open', pdf_path))
+                    else:  # Linux
+                        subprocess.call(('xdg-open', pdf_path))
+            except Exception as e:
+                error_msg = str(e)
+                detailed_msg = ""
+                
+                # 检查特定错误
+                if "SimSun" in error_msg:
+                    detailed_msg = (
+                        "系统中可能缺少所需的字体文件。尝试以下解决方案:\n\n"
+                        "1. 安装pypinyin库以启用拼音模式:\n"
+                        "   pip install pypinyin\n\n"
+                        "2. 确保系统中安装了常见中文字体(如宋体、微软雅黑等)\n\n"
+                        "3. 如果是Windows系统，重启应用后再试"
+                    )
+                
+                # 显示详细的错误信息
+                error_dialog = QMessageBox(self)
+                error_dialog.setIcon(QMessageBox.Warning)
+                error_dialog.setWindowTitle("导出失败")
+                error_dialog.setText(f"导出PDF报告失败: {error_msg}")
+                
+                if detailed_msg:
+                    error_dialog.setInformativeText(detailed_msg)
+                    
+                error_dialog.setStandardButtons(QMessageBox.Ok)
+                error_dialog.exec_()
                 
         except Exception as e:
-            QMessageBox.warning(self, "导出失败", f"导出PDF报告失败: {e}")
+            QMessageBox.warning(self, "导出失败", f"准备导出PDF报告时出错: {e}")
 
     def view_reminders(self):
         """查看所有提醒"""
