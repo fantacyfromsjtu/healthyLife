@@ -4,6 +4,8 @@ import time
 import json
 import functools
 import logging
+from utils.verification import hash_password, verify_password
+import traceback
 
 # 数据库操作重试装饰器
 def db_retry(max_attempts=3, delay=0.5):
@@ -53,9 +55,34 @@ class DatabaseManager:
         self.initialize()
 
     def initialize(self):
-        """初始化数据库连接并创建必要的表"""
-        self.connect()
-        self.create_tables()
+        """初始化数据库，包括连接数据库、创建表结构、初始化基础数据和升级密码"""
+        try:
+            # 确保连接到数据库
+            if not hasattr(self, 'conn') or self.conn is None:
+                self.connect()
+                
+            print("开始初始化数据库...")
+            
+            # 创建表结构
+            self.create_tables()
+            print("数据库表结构初始化完成")
+            
+            # 初始化食物数据库
+            food_init_result = self.initialize_food_database()
+            if food_init_result:
+                print("食物数据库初始化成功")
+            else:
+                print("食物数据库初始化失败或已经初始化过")
+            
+            # 升级老用户的明文密码到哈希密码
+            self.upgrade_passwords()
+            
+            print("数据库初始化完成")
+            return True
+        except Exception as e:
+            print(f"数据库初始化过程出错: {e}")
+            traceback.print_exc()
+            return False
 
     def connect(self):
         """创建数据库连接"""
@@ -104,6 +131,7 @@ class DatabaseManager:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
+                salt TEXT NOT NULL,
                 gender TEXT,
                 age INTEGER,
                 height REAL,
@@ -124,6 +152,7 @@ class DatabaseManager:
                 
                 # 检查并添加缺失的列
                 for column, type_ in [
+                    ("salt", "TEXT"),
                     ("gender", "TEXT"),
                     ("age", "INTEGER"),
                     ("height", "REAL"),
@@ -250,9 +279,12 @@ class DatabaseManager:
     def add_user(self, username, password):
         """添加新用户"""
         try:
+            # 对密码进行哈希处理
+            hashed_password, salt = hash_password(password)
+            
             self.cursor.execute(
-                "INSERT INTO users (username, password) VALUES (?, ?)",
-                (username, password)
+                "INSERT INTO users (username, password, salt) VALUES (?, ?, ?)",
+                (username, hashed_password, salt)
             )
             self.conn.commit()
             return self.cursor.lastrowid
@@ -261,12 +293,47 @@ class DatabaseManager:
 
     def verify_user(self, username, password):
         """验证用户登录"""
-        self.cursor.execute(
-            "SELECT id FROM users WHERE username = ? AND password = ?",
-            (username, password)
-        )
-        result = self.cursor.fetchone()
-        return result[0] if result else None
+        try:
+            # 获取用户的哈希密码和盐值
+            self.cursor.execute(
+                "SELECT id, password, salt FROM users WHERE username = ?",
+                (username,)
+            )
+            result = self.cursor.fetchone()
+            
+            if not result:
+                return None
+                
+            user_id, stored_hash, salt = result
+            
+            # 兼容老密码（明文存储）
+            if salt is None or salt == "":
+                # 旧版验证方式 - 直接比较密码
+                self.cursor.execute(
+                    "SELECT id FROM users WHERE username = ? AND password = ?",
+                    (username, password)
+                )
+                old_result = self.cursor.fetchone()
+                
+                if old_result:
+                    # 存在旧密码匹配，自动升级到新的哈希密码格式
+                    hashed_password, new_salt = hash_password(password)
+                    self.cursor.execute(
+                        "UPDATE users SET password = ?, salt = ? WHERE id = ?",
+                        (hashed_password, new_salt, old_result[0])
+                    )
+                    self.conn.commit()
+                    return old_result[0]
+                return None
+            
+            # 新版验证方式 - 验证哈希密码
+            if verify_password(password, stored_hash, salt):
+                return user_id
+            
+            return None
+        except Exception as e:
+            print(f"用户验证出错: {e}")
+            return None
 
     def get_user_profile(self, user_id):
         """获取用户资料"""
@@ -1212,4 +1279,36 @@ class DatabaseManager:
             return True
         except Exception as e:
             print(f"删除睡眠记录出错: {str(e)}")
-            return False 
+            return False
+
+    def upgrade_passwords(self):
+        """升级数据库中的明文密码到哈希密码"""
+        try:
+            # 检查是否有用户的salt为空，表示是明文密码
+            self.cursor.execute("SELECT id, username, password FROM users WHERE salt IS NULL OR salt = ''")
+            users_to_upgrade = self.cursor.fetchall()
+            
+            if not users_to_upgrade:
+                print("所有用户密码已经是哈希格式，不需要升级")
+                return
+                
+            print(f"需要升级密码的用户数: {len(users_to_upgrade)}")
+            
+            for user_id, username, plain_password in users_to_upgrade:
+                try:
+                    # 对明文密码进行哈希处理
+                    hashed_password, salt = hash_password(plain_password)
+                    
+                    # 更新用户的密码和盐值
+                    self.cursor.execute(
+                        "UPDATE users SET password = ?, salt = ? WHERE id = ?",
+                        (hashed_password, salt, user_id)
+                    )
+                    print(f"已升级用户 {username} (ID: {user_id}) 的密码")
+                except Exception as e:
+                    print(f"升级用户 {username} (ID: {user_id}) 的密码时出错: {e}")
+            
+            self.conn.commit()
+            print("密码升级完成")
+        except Exception as e:
+            print(f"升级密码过程出错: {e}") 

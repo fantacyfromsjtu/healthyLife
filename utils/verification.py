@@ -6,6 +6,8 @@ from io import BytesIO
 from PyQt5.QtGui import QPixmap
 import os
 import math
+import hashlib
+import string
 
 def validate_phone_number(phone):
     """验证手机号格式是否正确（中国大陆手机号）"""
@@ -27,13 +29,55 @@ def validate_password_strength(password):
     
     return True, "密码强度合格"
 
-# 在真实环境中，这个函数会调用短信API
-def send_verification_code(phone, code):
-    """模拟发送验证码到手机"""
-    # 在实际应用中，这里会调用短信服务API
-    print(f"向手机号 {phone} 发送验证码: {code}")
-    # 模拟发送成功
-    return True 
+def generate_salt(length=16):
+    """生成随机盐值
+    
+    参数:
+        length: 盐值长度，默认16字符
+        
+    返回:
+        随机盐值字符串
+    """
+    salt_chars = string.ascii_letters + string.digits
+    return ''.join(random.choice(salt_chars) for _ in range(length))
+
+def hash_password(password, salt=None):
+    """使用SHA-256算法和盐值哈希密码
+    
+    参数:
+        password: 原始密码
+        salt: 盐值，如果未提供则自动生成
+        
+    返回:
+        (hashed_password, salt) 元组，包含哈希后的密码和使用的盐值
+    """
+    if salt is None:
+        salt = generate_salt()
+        
+    # 将密码和盐值组合并进行哈希
+    salted_password = password + salt
+    hash_obj = hashlib.sha256(salted_password.encode('utf-8'))
+    hashed_password = hash_obj.hexdigest()
+    
+    return hashed_password, salt
+
+def verify_password(password, stored_hash, salt):
+    """验证密码是否与存储的哈希值匹配
+    
+    参数:
+        password: 需要验证的密码
+        stored_hash: 存储的哈希值
+        salt: 存储的盐值
+        
+    返回:
+        布尔值，密码是否匹配
+    """
+    # 使用相同盐值计算哈希
+    calculated_hash, _ = hash_password(password, salt)
+    
+    # 比较计算出的哈希值与存储的哈希值
+    return calculated_hash == stored_hash
+
 
 def generate_captcha_text(length=4):
     """生成随机验证码文本，使用数字和大写字母，保留一定的混淆性"""
