@@ -1,13 +1,15 @@
 import datetime
 from PyQt5.QtWidgets import (QMainWindow, QCalendarWidget, QVBoxLayout, QHBoxLayout, 
                             QWidget, QPushButton, QLabel, QComboBox, QStackedWidget,
-                            QAction, QToolBar, QMessageBox, QFrame, QTabWidget, QInputDialog, QMenu)
-from PyQt5.QtCore import Qt, QDate
-from PyQt5.QtGui import QIcon, QFont, QColor, QPalette, QCursor
+                            QAction, QToolBar, QMessageBox, QFrame, QTabWidget, QInputDialog, QMenu, QFileDialog, QApplication)
+from PyQt5.QtCore import Qt, QDate, pyqtSignal, QTimer, QUrl
+from PyQt5.QtGui import QIcon, QFont, QColor, QPalette, QCursor, QDesktopServices
 from ui.diet_view import DietView
 from ui.exercise_view import ExerciseView
+from ui.custom_widgets import HealthyLifeComboBox
 from utils.health_analyzer import HealthAnalyzer
 from utils.report_generator import WeeklyReportGenerator
+from utils.style_helper import refresh_style
 import os
 
 # 导入其他需要的视图类
@@ -358,18 +360,26 @@ class MainWindow(QMainWindow):
         self.reminder_manager.reminder_triggered.connect(self.on_reminder_triggered)
         print("提醒管理器已连接到主窗口")
         
+        self.setWindowTitle(f"健康生活 - {username}")
+        self.resize(1280, 800)
+        
+        # 初始化界面
         self.init_ui()
+        self.refresh_styles()
         
         # 加载初始数据
         self.load_date_data()
         self.update_weekly_summary()
         
         print("主窗口实例化完成")
-        
+    
     def init_ui(self):
         """初始化用户界面"""
         self.setWindowTitle(f'健康生活 - {self.username}')
         self.resize(1280, 900)  # 增大窗口尺寸
+        
+        # 创建菜单
+        self.create_menu()
         
         # 创建中央部件
         central_widget = QWidget()
@@ -444,11 +454,14 @@ class MainWindow(QMainWindow):
         mode_layout = QHBoxLayout()
         mode_label = QLabel("显示模式:")
         mode_label.setObjectName("modeLabel")
-        self.mode_combo = QComboBox()
+        
+        # 使用自定义下拉框组件
+        self.mode_combo = HealthyLifeComboBox()
         self.mode_combo.setObjectName("modeCombo")
         self.mode_combo.addItems(["饮食", "运动", "睡眠", "计划"])
         self.mode_combo.currentIndexChanged.connect(self.mode_changed)
         self.mode_combo.setMinimumHeight(30)
+        
         mode_layout.addWidget(mode_label)
         mode_layout.addWidget(self.mode_combo)
         mode_layout.addStretch()
@@ -1147,4 +1160,141 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, title, content)
                 print("使用基本消息框显示提醒")
             except Exception as e2:
-                print(f"显示基本消息框也失败: {str(e2)}") 
+                print(f"显示基本消息框也失败: {str(e2)}")
+
+    def refresh_styles(self):
+        """刷新应用样式"""
+        if QApplication.instance():
+            refresh_style(QApplication.instance())
+            print("刷新应用样式完成")
+            
+            # 强制更新应用中所有的QComboBox
+            from PyQt5.QtWidgets import QComboBox
+            from ui.custom_widgets import HealthyLifeComboBox
+            
+            try:
+                # 获取所有可见的组合框并强制更新样式
+                for widget in QApplication.instance().allWidgets():
+                    if isinstance(widget, QComboBox) and not isinstance(widget, HealthyLifeComboBox):
+                        print(f"发现标准QComboBox: {widget.objectName()}")
+                        
+                        # 1. 保存当前数据和状态
+                        items = [widget.itemText(i) for i in range(widget.count())]
+                        current_index = widget.currentIndex()
+                        parent = widget.parent()
+                        object_name = widget.objectName()
+                        geometry = widget.geometry()
+                        minimum_height = widget.minimumHeight()
+                        maximum_height = widget.maximumHeight()
+                        minimum_width = widget.minimumWidth()
+                        maximum_width = widget.maximumWidth()
+                        
+                        # 2. 创建新的自定义下拉框
+                        try:
+                            # 检查原来的信号连接
+                            signal_connections = []
+                            if hasattr(widget, 'receivers'):
+                                for signal_name in ['currentIndexChanged', 'activated', 'highlighted']:
+                                    signal = getattr(widget, signal_name, None)
+                                    if signal and signal.receivers() > 0:
+                                        signal_connections.append(signal_name)
+                            
+                            # 记录原来的属性
+                            is_enabled = widget.isEnabled()
+                            is_visible = widget.isVisible()
+                            font = widget.font()
+                            
+                            # 创建新的下拉框
+                            new_combo = HealthyLifeComboBox(parent)
+                            new_combo.setObjectName(object_name)
+                            new_combo.setGeometry(geometry)
+                            new_combo.setMinimumHeight(minimum_height)
+                            new_combo.setMaximumHeight(maximum_height)
+                            new_combo.setMinimumWidth(minimum_width)
+                            new_combo.setMaximumWidth(maximum_width)
+                            new_combo.setEnabled(is_enabled)
+                            new_combo.setVisible(is_visible)
+                            new_combo.setFont(font)
+                            
+                            # 填充数据
+                            new_combo.addItems(items)
+                            if 0 <= current_index < len(items):
+                                new_combo.setCurrentIndex(current_index)
+                            
+                            # 替换在布局中的位置
+                            if parent and hasattr(parent, 'layout') and parent.layout():
+                                layout = parent.layout()
+                                for i in range(layout.count()):
+                                    item = layout.itemAt(i)
+                                    if item and item.widget() is widget:
+                                        print(f"在布局中找到下拉框，正在替换...")
+                                        # 替换布局中的小部件
+                                        widget.hide()
+                                        widget.setParent(None)
+                                        layout.replaceWidget(widget, new_combo)
+                                        break
+                            
+                            print(f"替换了下拉框: {object_name}")
+                        except Exception as e:
+                            print(f"替换下拉框失败: {e}")
+                
+                print("已处理所有下拉框")
+            except Exception as e:
+                print(f"刷新下拉框失败: {e}")
+            
+            # # 提醒用户
+            # QMessageBox.information(self, "样式已更新", "界面样式已刷新，下拉框显示问题已修复。")
+
+    def create_menu(self):
+        """创建菜单栏"""
+        menu_bar = self.menuBar()
+        
+        # 文件菜单
+        file_menu = menu_bar.addMenu("文件")
+        exit_action = QAction("退出", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # 用户菜单
+        user_menu = menu_bar.addMenu("用户")
+        profile_action = QAction("个人信息", self)
+        profile_action.triggered.connect(self.show_profile)
+        user_menu.addAction(profile_action)
+        
+        # 工具菜单
+        tools_menu = menu_bar.addMenu("工具")
+        refresh_style_action = QAction("刷新界面样式", self)
+        refresh_style_action.triggered.connect(self.refresh_styles)
+        tools_menu.addAction(refresh_style_action)
+        
+        backup_action = QAction("备份数据", self)
+        backup_action.triggered.connect(self.backup_data)
+        tools_menu.addAction(backup_action)
+        
+        # 帮助菜单
+        help_menu = menu_bar.addMenu("帮助")
+        about_action = QAction("关于", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+        
+        # 其他菜单项
+        # ... 保持不变 ...
+
+    def show_about(self):
+        """显示关于对话框"""
+        from PyQt5.QtWidgets import QMessageBox
+        QMessageBox.information(self, "关于", "健康生活应用程序\n版本 1.0\n\n© 2023 健康生活团队")
+
+    def backup_data(self):
+        """实现备份数据的功能"""
+        # 这里应该实现备份数据的逻辑
+        QMessageBox.information(self, "备份数据", "备份数据功能尚未实现")
+
+    def show_profile(self):
+        """显示个人信息窗口"""
+        from ui.profile import ProfileWindow
+        profile_window = ProfileWindow(self.user_id, self.username, self.db_manager)
+        profile_window.profile_updated.connect(self.update_user_info)
+        profile_window.exec_()
+
+    # ... 其他方法保持不变 ... 

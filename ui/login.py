@@ -26,13 +26,13 @@ class LoginWindow(QWidget):
         main_layout.setContentsMargins(40, 40, 40, 40)  # 增加边距
         
         # 添加应用标题
-        title_label = QLabel("健康生活管理")
+        title_label = QLabel("长期舒适")
         title_label.setObjectName("appTitle")
         title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label)
         
         # 添加应用描述
-        description = QLabel("记录健康数据，培养良好习惯")
+        description = QLabel("一款更适合大学生体质的健康生活小程序")
         description.setObjectName("appDescription")
         description.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(description)

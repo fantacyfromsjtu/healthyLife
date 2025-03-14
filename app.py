@@ -5,13 +5,14 @@ import sys
 import os
 import traceback
 from PyQt5.QtWidgets import QApplication, QMessageBox
-from PyQt5.QtGui import QIcon, QFont, QFontDatabase
+from PyQt5.QtGui import QIcon, QFont, QFontDatabase, QColor
 from PyQt5.QtCore import QLocale, QTranslator, QLibraryInfo
 import matplotlib
 matplotlib.use('Qt5Agg')  # 设置matplotlib后端为Qt5Agg
 
 from database.db_manager import DatabaseManager
 from ui.login import LoginWindow
+from utils.style_helper import refresh_style
 
 def setup_exception_handling():
     """设置全局异常处理"""
@@ -87,13 +88,38 @@ if __name__ == '__main__':
         # 设置应用样式
         app.setStyle('Fusion')
         
-        # 加载样式表
-        style_file = os.path.join(os.path.dirname(__file__), 'resources/styles/style.qss')
-        try:
-            with open(style_file, 'r', encoding='utf-8') as f:
-                app.setStyleSheet(f.read())
-        except Exception as e:
-            print(f"加载样式表失败: {e}")
+        # 加载样式表（使用新的刷新样式函数）
+        refresh_style(app)
+        
+        # 应用自定义QComboBox样式
+        def patch_combo_boxes():
+            """为所有QComboBox应用自定义样式"""
+            try:
+                from PyQt5.QtWidgets import QComboBox
+                from ui.custom_widgets import HealthyLifeComboBox
+                
+                # 为所有未来创建的QComboBox应用自定义的Item委托
+                from PyQt5.QtWidgets import QProxyStyle
+                
+                class ComboBoxProxyStyle(QProxyStyle):
+                    def drawControl(self, element, option, painter, widget=None):
+                        from PyQt5.QtWidgets import QStyle
+                        if element == QStyle.CE_ItemViewItem and isinstance(widget, QComboBox):
+                            # 修改选项颜色
+                            if option.state & QStyle.State_MouseOver:
+                                option.palette.setBrush(option.palette.Text, QColor(44, 62, 80))
+                            
+                        super().drawControl(element, option, painter, widget)
+                
+                # 应用代理样式
+                app.setStyle(ComboBoxProxyStyle(app.style()))
+                print("应用了ComboBoxProxyStyle")
+                
+            except Exception as e:
+                print(f"应用QComboBox自定义样式失败: {e}")
+        
+        # 调用补丁函数
+        patch_combo_boxes()
         
         # 设置中文字体支持
         setup_chinese_fonts(app)

@@ -34,13 +34,13 @@ QLabel#dateLabel {
 QLabel#appTitle {
     font-size: 28pt;
     font-weight: bold;
-    color: #3498db;
+    color:rgb(219, 133, 52);
     margin-bottom: 10px;
 }
 
 QLabel#appDescription {
     font-size: 16pt;
-    color: #7f8c8d;
+    color:rgb(139, 151, 152);
     margin-bottom: 25px;
 }
 
@@ -71,7 +71,7 @@ QPushButton#primaryButton:hover, QPushButton#actionButton:hover {
 }
 
 QPushButton#secondaryButton {
-    background-color: #2ecc71;
+    background-color: #3498db;
     color: white;
     font-weight: bold;
     min-height: 45px;
@@ -79,7 +79,7 @@ QPushButton#secondaryButton {
 }
 
 QPushButton#secondaryButton:hover {
-    background-color: #27ae60;
+    background-color: #2980b9;
 }
 
 /* 输入框样式 */
@@ -119,6 +119,49 @@ QComboBox, QComboBox#modeCombo {
     background-color: white;
     min-height: 30px;
     font-size: 12pt;
+}
+
+/* 下拉菜单样式 - 完全重写 */
+QComboBox QAbstractItemView {
+    border: 1px solid #bdc3c7;
+    border-radius: 0;
+    background-color: white;
+    selection-background-color: #3498db;
+    color: #2c3e50;
+    font-size: 12pt;
+    outline: 0px;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+QComboBox QAbstractItemView::item {
+    min-height: 25px;
+    padding: 5px;
+    border: none;
+    color: #2c3e50;
+}
+
+/* 悬停项的样式 */
+QComboBox QAbstractItemView::item:hover {
+    background-color: #e8f4fc;
+    color: #2c3e50; 
+    font-weight: normal;
+}
+
+/* 选中项的样式 */
+QComboBox QAbstractItemView::item:selected {
+    background-color: #3498db;
+    color: white;
+}
+
+/* 修改下拉按钮样式 */
+QComboBox::down-arrow {
+    width: 10px;
+    height: 10px;
+    /* 不使用不存在的图片 */
 }
 
 /* 日历样式 */
