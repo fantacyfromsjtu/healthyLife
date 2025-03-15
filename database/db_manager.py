@@ -1302,7 +1302,7 @@ class DatabaseManager:
             users_to_upgrade = self.cursor.fetchall()
             
             if not users_to_upgrade:
-                print("所有用户密码已经是哈希格式，不需要升级")
+                # print("所有用户密码已经是哈希格式，不需要升级")
                 return
                 
             print(f"需要升级密码的用户数: {len(users_to_upgrade)}")

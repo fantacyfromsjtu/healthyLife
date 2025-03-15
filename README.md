@@ -21,30 +21,3 @@
 报告导出pdf功能
 
 
-healthyLife/
-│
-├── main.py                 # 程序入口
-├── database/
-│   ├── __init__.py
-│   ├── db_manager.py       # 数据库管理
-│   └── models.py           # 数据模型
-│
-├── ui/
-│   ├── __init__.py
-│   ├── login.py            # 登录/注册界面
-│   ├── main_window.py      # 主窗口(日历视图)
-│   ├── profile.py          # 用户信息界面
-│   ├── daily_entry.py      # 每日记录界面
-│   ├── schedule.py         # 计划安排界面
-│   └── report.py           # 健康报告界面
-│
-├── utils/
-│   ├── __init__.py
-│   ├── reminder.py         # 提醒功能
-│   ├── analyzer.py         # 数据分析
-│   └── report_generator.py # 报告生成
-│
-└── resources/
-    ├── icons/              # 图标
-    ├── styles/             # 样式表
-    └── templates/          # 报告模板
