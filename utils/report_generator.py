@@ -453,7 +453,7 @@ class WeeklyReportGenerator:
         )
         
         story.append(Spacer(1, 2*cm))
-        story.append(Paragraph(self._convert_text_if_needed(f"健康生活应用生成 - {today.strftime('%Y-%m-%d %H:%M:%S')}"), footer_style))
+        story.append(Paragraph(self._convert_text_if_needed(f"长期舒适 - {today.strftime('%Y-%m-%d %H:%M:%S')}"), footer_style))
         
         # 构建PDF
         doc.build(story)

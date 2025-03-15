@@ -886,21 +886,34 @@ class DatabaseManager:
             return False
 
     def delete_reminder(self, reminder_id):
-        """
-        删除提醒
+        """删除提醒
         
         参数:
             reminder_id (int): 提醒ID
             
         返回:
-            bool: 删除是否成功
+            bool: 成功返回True，失败返回False
         """
         try:
-            self.cursor.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
+            print(f"删除提醒: ID={reminder_id}")
+            cursor = self.conn.cursor()
+            
+            # 执行删除
+            cursor.execute(
+                "DELETE FROM reminders WHERE id = ?",
+                (reminder_id,)
+            )
             self.conn.commit()
-            return True
-        except Exception as e:
-            print(f"删除提醒失败: {e}")
+            
+            # 检查是否删除了数据
+            if cursor.rowcount > 0:
+                print(f"提醒{reminder_id}已删除")
+                return True
+            else:
+                print(f"未找到提醒{reminder_id}")
+                return False
+        except sqlite3.Error as e:
+            print(f"删除提醒失败: {str(e)}")
             return False
 
     def mark_reminder_completed(self, reminder_id):

@@ -190,28 +190,29 @@ class ReminderView(QWidget):
         for row, reminder in enumerate(reminders):
             self.reminder_table.insertRow(row)
             
+            # 数据库提醒表结构: (id, user_id, reminder_date, reminder_time, reminder_type, content, is_completed, created_at)
             # 隐藏ID列，但保留数据
-            id_item = QTableWidgetItem(str(reminder['id']))
+            id_item = QTableWidgetItem(str(reminder[0]))  # ID
             self.reminder_table.setItem(row, 0, id_item)
             
             # 类型
-            type_item = QTableWidgetItem(reminder['reminder_type'])
+            type_item = QTableWidgetItem(reminder[4])  # reminder_type
             self.reminder_table.setItem(row, 1, type_item)
             
             # 日期
-            date_item = QTableWidgetItem(reminder['date'])
+            date_item = QTableWidgetItem(reminder[2])  # reminder_date
             self.reminder_table.setItem(row, 2, date_item)
             
             # 时间
-            time_item = QTableWidgetItem(reminder['time'])
+            time_item = QTableWidgetItem(reminder[3])  # reminder_time
             self.reminder_table.setItem(row, 3, time_item)
             
             # 内容
-            content_item = QTableWidgetItem(reminder['content'])
+            content_item = QTableWidgetItem(reminder[5])  # content
             self.reminder_table.setItem(row, 4, content_item)
             
             # 如果已完成，设置灰色
-            if reminder['is_completed']:
+            if reminder[6]:  # is_completed
                 for col in range(5):
                     self.reminder_table.item(row, col).setBackground(Qt.lightGray)
         
@@ -251,6 +252,8 @@ class ReminderView(QWidget):
         row = selected_rows[0].row()
         reminder_id = int(self.reminder_table.item(row, 0).text())
         
+        print(f"准备删除提醒ID: {reminder_id}")
+        
         response = QMessageBox.question(
             self, 
             "确认删除", 
@@ -260,9 +263,16 @@ class ReminderView(QWidget):
         )
         
         if response == QMessageBox.Yes:
-            success = self.db_manager.delete_reminder(reminder_id)
-            if success:
-                QMessageBox.information(self, "成功", "提醒已删除")
-                self.load_reminders()
+            print(f"用户确认删除提醒 {reminder_id}")
+            # 检查是否有delete_reminder方法
+            if hasattr(self.db_manager, 'delete_reminder'):
+                print(f"正在调用db_manager.delete_reminder...")
+                success = self.db_manager.delete_reminder(reminder_id)
+                if success:
+                    QMessageBox.information(self, "成功", "提醒已删除")
+                    self.load_reminders()
+                else:
+                    QMessageBox.critical(self, "错误", "删除提醒失败")
             else:
-                QMessageBox.critical(self, "错误", "删除提醒失败") 
+                print("错误: db_manager没有delete_reminder方法")
+                QMessageBox.critical(self, "错误", "系统不支持删除提醒功能") 

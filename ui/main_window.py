@@ -360,7 +360,7 @@ class MainWindow(QMainWindow):
         self.reminder_manager.reminder_triggered.connect(self.on_reminder_triggered)
         print("提醒管理器已连接到主窗口")
         
-        self.setWindowTitle(f"健康生活 - {username}")
+        self.setWindowTitle(f"长期舒适 - {username}")
         self.resize(1280, 800)
         
         # 初始化界面
@@ -375,11 +375,8 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle(f'健康生活 - {self.username}')
+        self.setWindowTitle(f'长期舒适 - {self.username}')
         self.resize(1280, 900)  # 增大窗口尺寸
-        
-        # 创建菜单
-        self.create_menu()
         
         # 创建中央部件
         central_widget = QWidget()
@@ -1076,9 +1073,22 @@ class MainWindow(QMainWindow):
 
     def view_reminders(self):
         """查看所有提醒"""
-        from ui.reminder import ReminderView
-        self.reminder_view = ReminderView(self.user_id, self.db_manager, self)
-        self.reminder_view.show()
+        try:
+            print("正在切换到提醒视图...")
+            # 直接切换到计划视图（索引为3）
+            self.mode_combo.setCurrentIndex(3)
+            # 调用mode_changed方法来切换视图
+            self.mode_changed(3)
+            # 确保提醒数据已刷新
+            if hasattr(self.plan_view, 'load_reminders'):
+                self.plan_view.load_reminders()
+                print("提醒数据已刷新")
+            print("已成功切换到提醒视图")
+        except Exception as e:
+            print(f"切换到提醒视图时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "错误", f"查看提醒时发生错误: {str(e)}")
 
     def update_weekly_summary(self):
         """更新周摘要信息"""
@@ -1245,45 +1255,11 @@ class MainWindow(QMainWindow):
             # # 提醒用户
             # QMessageBox.information(self, "样式已更新", "界面样式已刷新，下拉框显示问题已修复。")
 
-    def create_menu(self):
-        """创建菜单栏"""
-        menu_bar = self.menuBar()
-        
-        # 文件菜单
-        file_menu = menu_bar.addMenu("文件")
-        exit_action = QAction("退出", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        
-        # 用户菜单
-        user_menu = menu_bar.addMenu("用户")
-        profile_action = QAction("个人信息", self)
-        profile_action.triggered.connect(self.show_profile)
-        user_menu.addAction(profile_action)
-        
-        # 工具菜单
-        tools_menu = menu_bar.addMenu("工具")
-        refresh_style_action = QAction("刷新界面样式", self)
-        refresh_style_action.triggered.connect(self.refresh_styles)
-        tools_menu.addAction(refresh_style_action)
-        
-        backup_action = QAction("备份数据", self)
-        backup_action.triggered.connect(self.backup_data)
-        tools_menu.addAction(backup_action)
-        
-        # 帮助菜单
-        help_menu = menu_bar.addMenu("帮助")
-        about_action = QAction("关于", self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
-        
-        # 其他菜单项
-        # ... 保持不变 ...
 
     def show_about(self):
         """显示关于对话框"""
         from PyQt5.QtWidgets import QMessageBox
-        QMessageBox.information(self, "关于", "健康生活应用程序\n版本 1.0\n\n© 2023 健康生活团队")
+        QMessageBox.information(self, "关于", "长期舒适\n版本 1.0\n\n© 2025 千早爱音")
 
     def backup_data(self):
         """实现备份数据的功能"""

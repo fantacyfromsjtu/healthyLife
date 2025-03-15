@@ -18,7 +18,7 @@ class LoginWindow(QWidget):
         
     def init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle('健康生活 - 登录/注册')
+        self.setWindowTitle('长期舒适 - 登录/注册')
         self.resize(1000, 800)  # 增大窗口尺寸
         
         # 主布局
@@ -63,7 +63,7 @@ class LoginWindow(QWidget):
         main_layout.addWidget(content_frame)
         
         # 添加版权信息
-        copyright_label = QLabel("© 2025 大学生健康生活")
+        copyright_label = QLabel("© 2025 长期舒适")
         copyright_label.setObjectName("copyright")
         copyright_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(copyright_label)
