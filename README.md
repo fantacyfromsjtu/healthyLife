@@ -21,3 +21,21 @@
 报告导出pdf功能
 
 
+## 运行方法
+
+操作系统：Windows/Linux
+
+环境配置
+
+```bash
+cd healthyLife
+conda create -n healthy python=3.10
+conda activate healthy
+pip install -r requirements.txt
+```
+
+运行
+
+```bash
+python app.py
+```
